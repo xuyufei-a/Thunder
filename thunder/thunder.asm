@@ -2,7 +2,6 @@
 .model flat, stdcall
 option casemap: none
 
-; 系统库
 include windows.inc
 include gdi32.inc
 includelib gdi32.lib
@@ -19,7 +18,6 @@ includelib shell32.lib
 include	 winmm.inc
 includelib  winmm.lib
 
-; 自定义库
 include thunder.inc
 
 ;====================CODE===================
@@ -100,8 +98,6 @@ WinMain ENDP
 
 ; ########################################################################
 WndProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
-	invoke DefWindowProc, hWin, uMsg, wParam, lParam
-	ret
 	.if gameStatus == GSTATUS_MENU
 		invoke MenuProc, hWin, uMsg, wParam, lParam
 	.elseif gameStatus == GSTATUS_GAME
@@ -109,6 +105,7 @@ WndProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
 	.elseif gameStatus == GSTATUS_SUSPEND
 		invoke SuspendProc, hWin, uMsg, wParam, lParam
 	.endif
+	invoke DefWindowProc, hWin, uMsg, wParam, lParam
 	
 	ret
 
@@ -125,11 +122,62 @@ MenuProc ENDP
 ; ########################################################################
 GameProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
 	
+	.if uMsg == WM_KEYDOWN
+		.if wParam == KEY_A
+			mov aKeyHold, True
+		.elseif wParam == KEY_D
+			mov dKeyHold, True
+		.elseif wParam == KEY_UPARROW
+			mov upKeyHold, True
+		.elseif wParam == KEY_DOWNARROW
+			mov downKeyHold, True
+		.elseif wParam == KEY_SPACE
+			mov spaceKeyHold, True
+		.elseif wParam == KEY_ENTER
+			mov enterKeyHold, True
+		.elseif wParam == KEY_ESC
+			mov gameStatus, GSTATUS_SUSPEND
+		.endif
+	.elseif uMsg == WM_KEYUP
+		.if wParam == KEY_A
+			mov aKeyHold, False
+		.elseif wParam == KEY_D
+			mov dKeyHold, False
+		.elseif wParam == KEY_UPARROW
+			mov upKeyHold, False
+		.elseif wParam == KEY_DOWNARROW
+			mov downKeyHold, False
+		.elseif wParam == KEY_SPACE
+			mov spaceKeyHold, False
+		.elseif wParam == KEY_ENTER
+			mov enterKeyHold, False
+		.endif
+	.elseif uMsg == WM_PAINT
+		; tobedone how to paint the game
 
+		invoke DrawGameScene
+	.elseif uMsg == WM_DESTROY
+		invoke PostQuitMessage, NULL
 
-
-
+		; tobedone del created objects
+	.elseif uMsg == WM_TIMER
+		invoke SolveCollision
+		invoke CalNextPos
+	.endif
+				
+	invoke DefWindowProc, hWin, uMsg, wParam, lParam
+	ret
 GameProc ENDP
+; ########################################################################
+CalNextPos PROC
+	; loop iterate all the bullets in the circular queue
+		
+	Loop:	
+		
+	Test:
+			
+
+CalNextPos ENDP
 ; ########################################################################
 SuspendProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
 	
