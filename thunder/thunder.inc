@@ -12,7 +12,7 @@
 ;-------------function for GSTATUS_GAME status--------------
 ; function for painting
 	InitDC	PROTO
-	DeleteDC PROTO
+	DestroyDC PROTO
 	DrawPlane PROTO
 	DrawBullet PROTO
 	DrawExplosion	PROTO
@@ -24,7 +24,7 @@
 	InitGame	PROTO	:DWORD				; pamameter is the number of players(1 or 2)
 	; function used when timer expires
 	CheckIlligal PROTO :DWORD				; check if the rect is in the window, parameter is the address of the rect
-	CheckIntersection PROTO :DOWRD, :DWORD	; check if the two rects intersect, parameters are the address of the two rects
+	CheckIntersection PROTO :DWORD, :DWORD	; check if the two rects intersect, parameters are the address of the two rects
 	SolveCollision PROTO					; remove bullets and planes that collide with others
 	CalNextPos	PROTO						; iterate enemy planes queue and bullet queue, cal their next position
 
@@ -44,57 +44,7 @@
 	PopExplosion PROTO
 	GetExplosionFront PROTO
 
-;=========local struct define========
-MyRect STRUCT 
-; position
-	x		SWORD ?
-	y		SWORD ?
-; size
-	width	SWORD ?
-	height	SWORD ?
-MyRect ENDS
 
-Bullet STRUCT
-; position
-	rect		MyRect <>
-; speed
-	xSpeed		SWORD ?
-	ySpeed		SWORD ?
-; color, up to which camp it belongs
-	color		D	WORD ?
-Bullet ENDS
-
-Plane STRUCT
-; position
-	rect		MyRect <>
-; speed
-	xSpeed		SWORD ?
-	ySpeed		SWORD ?
-; bmpimage
-	hDcBmp		DWORD ?
-	hDcBmpMask	DWORD ?
-	width		SWORD ?
-	height		SWORD ?
-; the countdown for next emit bullet
-	nextEmitCountdown	SWORD ?
-Plane ENDS
-		
-PlayerPlane STRUCT
-	plane		Plane <>
-	health		DWORD ?
-PlayerPlane ENDS
-
-Explosion STRUCT
-; position 
-	rect		MyRect <>
-; bmpimage
-	hDcBmp		DWORD ?
-	hDcBmpMask	DWROD ?
-; remianing duration
-	duration	DWORD ?
-Explosion ENDS
-
-; function for logic, such as collision detection, calulating next position
 
 ;===========local macros=============
 
@@ -120,9 +70,9 @@ Explosion ENDS
 True				EQU		1
 False				EQU		0
 
-
 WINDOW_WIDTH		EQU		640
 WINDOW_HEIGHT		EQU		480
+GAME_REFRESH_INTERVAL	EQU		30
 
 ; game status
 
@@ -160,6 +110,9 @@ BULLET_COLOR_ENEMY	EQU		0x00FF0000
 
 ; some const for game logic
 
+; num const
+MAX_HEALTH				EQU		3
+
 ; time const
 PLAYER_EMIT_INTERVAL	EQU		10
 ENEMY_EMIT_INTERVAL		EQU		100
@@ -167,7 +120,8 @@ EXPLOSION_DURATION		EQU		10
 
 
 ; size const
-PLAYER_PLANE_WIDTH		EQU		50
+PLAYER_PLANE_WIDTH		EQU		60
+PLAYER_PLANE_HEIGHT		EQU		50
 
 
 BULLET_WIDTH			EQU		5
@@ -177,16 +131,77 @@ BULLET_HEIGHT			EQU		10
 ; pos const 
 
 P1_BIRTH_POINT_X		EQU		100
+P1_BIRTH_POINT_Y		EQU		WINDOW_HEIGHT - PLAYER_PLANE_HEIGHT
 P2_BIRTH_POINT_X		EQU     200
+P2_BIRTH_POINT_Y		EQU		WINDOW_HEIGHT - PLAYER_PLANE_HEIGHT
 
+; speed const 
+SPEED_PLAYER_X			EQU		10
+SPEED_PLAYER_Y			EQU		0
+SPEED_PLAYER_BULLET		EQU		1
+SPEED_ENEMY_BULLET		EQU		1
+
+
+;=========local struct define========
+MyRect STRUCT 
+; position
+	x		SWORD ?
+	y		SWORD ?
+; size
+	width	SWORD ?
+	height	SWORD ?
+MyRect ENDS
+
+Bullet STRUCT
+; position
+	rect		MyRect <>
+; speed
+	xSpeed		SWORD ?
+	ySpeed		SWORD ?
+; color, up to which camp it belongs
+	color		DWORD ?
+Bullet ENDS
+
+Plane STRUCT
+; position
+	rect		MyRect <>
+; speed
+	xSpeed		SWORD ?
+	ySpeed		SWORD ?
+; bmpimage
+	hDcBmp		DWORD ?
+	hDcBmpMask	DWORD ?
+	width		SWORD ?
+	height		SWORD ?
+; the countdown for next emit bullet
+	nextEmitCountdown	SWORD ?
+Plane ENDS
+		
+PlayerPlane STRUCT
+	plane		Plane <>
+	health		DWORD ?
+PlayerPlane ENDS
+
+Explosion STRUCT
+; position 
+	rect		MyRect <>
+; bmpimage
+	hDcBmp		DWORD ?
+	hDcBmpMask	DWORD ?
+; remianing duration
+	duration	DWORD ?
+Explosion ENDS
+
+; ===================data========================
 .data 
 szDisplayName	DB "Thunder"
 
 hInstance		DWORD ?	; 创建当前进程的文件的句柄
 hMainWnd		DWORD ? ; 窗口的句柄
 
-gameStatus		DWORD 1 ; 当前游戏所处的状态
+gameStatus		DWORD GSTAUTS_MEMU ; 当前游戏所处的状态
 
+ps				PAINTSTRUCT <>	; tobedone
 
 ; game resource handles 
 hIcon				DWORD ?	; 当前窗口的图标
@@ -224,6 +239,6 @@ p2Plane			PlayerPlane <>
 aKeyHold			DWORD 0
 dKeyHold			DWORD 0
 spacebarKeyHold		DWORD 0
-leftKeyHold			DOWRD 0
-rightKeyHold		DOWRD 0
+leftKeyHold			DWORD 0
+rightKeyHold		DWORD 0
 enterKeyHold		DWORD 0
