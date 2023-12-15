@@ -19,6 +19,7 @@ include	 winmm.inc
 includelib  winmm.lib
 
 include thunder.inc
+include resource.inc
 
 ;====================CODE===================
 .code
@@ -290,7 +291,7 @@ EmitBullet PROC
 			mov [pBullet+Bullet.MyRect.width], BULLET_WIDTH
 			mov [pBullet+Bullet.MyRect.height], BULLET_HEIGHT
 			mov [pBullet+Bullet.xSpeed], 0
-			mov [pBullet+Bullet.ySpeed], -BULLET_SPEED
+			mov [pBullet+Bullet.ySpeed], -SPEED_PLAYER_BULLET
 			mov [pBullet+Bullet.color], BULLET_COLOR_PLAYER
 			invoke PushBullet, pBullet
 			
@@ -500,13 +501,13 @@ CalNextPos PROC
 		invoke GetBulletFront
 		mov pBullet, eax
 		invoke PopBullet
-
-		mov ax, SWORD PTR [pBullet+Bullet.rect.x]
-		add ax, SWORD PTR [pBullet+Bullet.xSpeed]
-		mov SWORD PTR [pBullet+Bullet.rect.x], ax
-		mov ax, SWORD PTR [pBullet+Bullet.rect.y]
-		add ax, SWORD PTR [pBullet+Bullet.ySpeed]
-		mov SWORD PTR [pBullet+Bullet.rect.y], ax
+	
+		mov eax, [pBullet+Bullet.rect.x]
+		add eax, [pBullet+Bullet.xSpeed]
+		mov [pBullet+Bullet.rect.x], eax
+		mov eax, [pBullet+Bullet.rect.y]
+		add eax, [pBullet+Bullet.ySpeed]
+		mov [pBullet+Bullet.rect.y], eax
 		invoke CheckIllegal, pBullet
 		.if eax == True
 			invoke PushBullet, pBullet
@@ -521,12 +522,13 @@ CalNextPos PROC
 		mov pPlane, eax
 		invoke PopPlane
 
-		mov ax, SWORD PTR [pPlane+Plane.rect.x]
-		add ax, SWORD PTR [pPlane+Plane.xSpeed]
-		mov SWORD PTR [pPlane+Plane.rect.x], ax
-		mov ax, SWORD PTR [pPlane+Plane.rect.y]
-		add ax, SWORD PTR [pPlane+Plane.ySpeed]
-		mov SWORD PTR [pPlane+Plane.rect.y], ax
+	; modify following code becase the variable are now SDWORD
+		mov eax, [pPlane+Plane.rect.x]
+		add eax, [pPlane+Plane.xSpeed]
+		mov pPlane+Plane.rect.x], eax
+		mov eax, [pPlane+Plane.rect.y]
+		add eax, [pPlane+Plane.ySpeed]
+		mov [pPlane+Plane.rect.y], eax
 		invoke CheckIllegal, pPlane
 		.if eax == True
 			invoke PushPlane, pPlane
@@ -538,39 +540,39 @@ CalNextPos PROC
 	; cal player plane's next position
 	
 	.if aKeyHold == True
-		mov ax, SWORD PTR [p1Plane+PlayerPlane.rect.x]
-		sub ax, SWORD PTR [p1Plane+PlayerPlane.plane.xSpeed]
-		.if ax < 0
-			mov ax, 0
+		mov eax, [p1Plane+PlayerPlane.rect.x]
+		sub eax, [p1Plane+PlayerPlane.plane.xSpeed]
+		.if eax < 0
+			mov eax, 0
 		.endif
-		mov SWORD PTR [p1Plane+PlayerPlane.rect.x], ax
+		mov [p1Plane+PlayerPlane.rect.x], eax
 	.endif
 	
 	.if dKeyHold == True
-		mov ax, SWORD PTR [p1Plane+PlayerPlane.rect.x]
-		add ax, SWORD PTR [p1Plane+PlayerPlane.plane.xSpeed]
-		.if ax + PLAYER_PLANE_WIDTH > WINDOW_WIDTH
-			mov ax, WINDOW_WIDTH - PLAYER_PLANE_WIDTH
+		mov eax, [p1Plane+PlayerPlane.rect.x]
+		add eax, [p1Plane+PlayerPlane.plane.xSpeed]
+		.if eax + PLAYER_PLANE_WIDTH > WINDOW_WIDTH
+			mov eax, WINDOW_WIDTH - PLAYER_PLANE_WIDTH
 		.endif
-		mov SWORD PTR [p1Plane+PlayerPlane.rect.x], ax
+		mov [p1Plane+PlayerPlane.rect.x], eax
 	.endif
 	; tobedone unknown bug for different size hint if I don't specify the size of the variable
 	.if leftKeyHold == True
-		mov ax, SWORD PTR [p2Plane+PlayerPlane.rect.x]
-		sub ax, SWORD PTR [p2Plane+PlayerPlane.plane.xSpeed]
-		.if ax < 0
+		mov eax, [p2Plane+PlayerPlane.rect.x]
+		sub eax, [p2Plane+PlayerPlane.plane.xSpeed]
+		.if eax < 0
 			mov ax, 0
 		.endif
-		mov SWORD PTR [p2Plane+PlayerPlane.rect.x], ax
+		mov [p2Plane+PlayerPlane.rect.x], eax
 	.endif
 
 	.if rightKeyHold == True
-		mov ax, SWORD PTR [p2Plane+PlayerPlane.rect.x]
-		add ax, SWORD PTR [p2Plane+PlayerPlane.plane.xSpeed]
-		.if ax + PLAYER_PLANE_WIDTH > WINDOW_WIDTH
+		mov eax, [p2Plane+PlayerPlane.rect.x]
+		add eax, [p2Plane+PlayerPlane.plane.xSpeed]
+		.if eax + PLAYER_PLANE_WIDTH > WINDOW_WIDTH
 			mov ax, WINDOW_WIDTH - PLAYER_PLANE_WIDTH
 		.endif
-		mov SWORD PTR [p2Plane+PlayerPlane.rect.x], ax
+		mov [p2Plane+PlayerPlane.rect.x], eax
 	.endif
 	ret
 CalNextPos ENDP
@@ -792,15 +794,15 @@ DrawPlane PROC
 		mov pPlane, eax
 		invoke PopPlane
 		
-		invoke StrenchBlt, hMemDc, [pPlane+Plane.MyRect.x], [pPlane+Plane.MyRect.y],
-						[pPlane+Plane.MyRect.width], [pPlane+Plane.MyRect.height], 
-						[pPlane+Plane.hDcBmpMsk], 0, 0, 
-						[pPlane+Plane.width], [pPlane+Plane.height], SRCSAND
+		invoke StretchBlt, hMemDc, SDWORD PTR [pPlane+Plane.MyRect.x], SDWORD PTR [pPlane+Plane.MyRect.y],
+						SDWORD PTR [pPlane+Plane.MyRect.width], SDWORD PTR [pPlane+Plane.MyRect.height], 
+						[pPlane+Plane.hDcBmpMask], 0, 0, 
+						SDWORD PTR [pPlane+Plane.width], SDWORD PTR [pPlane+Plane.height], SRCAND
 		
-		invoke StrenchBlt, hMemDc, [pPlane+Plane.MyRect.x], [pPlane+Plane.MyRect.y],
-						[pPlane+Plane.MyRect.width], [pPlane+Plane.MyRect.height], 
+		invoke StretchBlt, hMemDc, SDWORD PTR [pPlane+Plane.MyRect.x], SDWORD PTR [pPlane+Plane.MyRect.y],
+						SDWORD PTR [pPlane+Plane.MyRect.width], SDWORD PTR [pPlane+Plane.MyRect.height], 
 						[pPlane+Plane.hDcBmp], 0, 0, 
-						[pPlane+Plane.width], [pPlane+Plane.height], SRCSPAND
+						SDWORD PTR [pPlane+Plane.width], SDWORD PTR [pPlane+Plane.height], SRCPAINT
 
 		invoke PushPlane, pPlane
 		dec planeCount
@@ -810,28 +812,29 @@ DrawPlane PROC
 	.if p1Plane.health > 0
 		mov pPlane, offset p1Plane
 
-		invoke StrenchBlt, hMemDc, [pPlane+Plane.MyRect.x], [pPlane+Plane.MyRect.y],
-						[pPlane+Plane.MyRect.width], [pPlane+Plane.MyRect.height], 
-						[pPlane+Plane.hDcBmpMsk], 0, 0, 
-						[pPlane+Plane.width], [pPlane+Plane.height], SRCSAND
+		invoke StretchBlt, hMemDc, SDWORD PTR [pPlane+Plane.MyRect.x], SDWORD PTR [pPlane+Plane.MyRect.y],
+						SDWORD PTR [pPlane+Plane.MyRect.width], SDWORD PTR [pPlane+Plane.MyRect.height], 
+						[pPlane+Plane.hDcBmpMask], 0, 0, 
+						SDWORD PTR [pPlane+Plane.width], SDWORD PTR [pPlane+Plane.height], SRCAND
 		
-		invoke StrenchBlt, hMemDc, [pPlane+Plane.MyRect.x], [pPlane+Plane.MyRect.y],
-						[pPlane+Plane.MyRect.width], [pPlane+Plane.MyRect.height], 
+		invoke StretchBlt, hMemDc, SDWORD PTR [pPlane+Plane.MyRect.x], SDWORD PTR [pPlane+Plane.MyRect.y],
+						SDWORD PTR [pPlane+Plane.MyRect.width], SDWORD PTR [pPlane+Plane.MyRect.height], 
 						[pPlane+Plane.hDcBmp], 0, 0, 
-						[pPlane+Plane.width], [pPlane+Plane.height], SRCSPAND
+						SDWORD PTR [pPlane+Plane.width], SDWORD PTR [pPlane+Plane.height], SRCPAINT
+
 	.endif
 	.if p2Plane.health > 0
 		mov pPlane, offset p2Plane
 
-		invoke StrenchBlt, hMemDc, [pPlane+Plane.MyRect.x], [pPlane+Plane.MyRect.y],
-						[pPlane+Plane.MyRect.width], [pPlane+Plane.MyRect.height], 
-						[pPlane+Plane.hDcBmpMsk], 0, 0, 
-						[pPlane+Plane.width], [pPlane+Plane.height], SRCSAND
+		invoke StretchBlt, hMemDc, SDWORD PTR [pPlane+Plane.MyRect.x], SDWORD PTR [pPlane+Plane.MyRect.y],
+						SDWORD PTR [pPlane+Plane.MyRect.width], SDWORD PTR [pPlane+Plane.MyRect.height], 
+						[pPlane+Plane.hDcBmpMask], 0, 0, 
+						SDWORD PTR [pPlane+Plane.width], SDWORD PTR [pPlane+Plane.height], SRCAND
 		
-		invoke StrenchBlt, hMemDc, [pPlane+Plane.MyRect.x], [pPlane+Plane.MyRect.y],
-						[pPlane+Plane.MyRect.width], [pPlane+Plane.MyRect.height], 
+		invoke StretchBlt, hMemDc, SDWORD PTR [pPlane+Plane.MyRect.x], SDWORD PTR [pPlane+Plane.MyRect.y],
+						SDWORD PTR [pPlane+Plane.MyRect.width], SDWORD PTR [pPlane+Plane.MyRect.height], 
 						[pPlane+Plane.hDcBmp], 0, 0, 
-						[pPlane+Plane.width], [pPlane+Plane.height], SRCSPAND
+						SDWORD PTR [pPlane+Plane.width], SDWORD PTR [pPlane+Plane.height], SRCPAINT
 	.endif
 	ret
 DrawPlane ENDP
@@ -897,14 +900,14 @@ DrawExplosion PROC
 		dec [pExplosion+Explosion.duration]
 		.continue .if [pExplosion+Explosion.duration] == 0	; it the explosion expires
 		
-		invoke StrenchBlt, hMemDc, 
+		invoke StretchBlt, hMemDc, 
 						[pExplosion+Explosion.MyRect.x], [pExplosion+Explosion.MyRect.y], 
 						[pExplosion+Explosion.MyRect.width], [pExplosion+Explosion.MyRect.height], 
 						[pExplosion+Explosion.hDcBmpMask],
 						0, 0,
 						BMP_SIZE_BOOM_SIZE, BMP_SIZE_BOOM_SIZE, SRCAND
 
-		invoke StrenchBlt, hMemDc, 
+		invoke StretchBlt, hMemDc, 
 						[pExplosion+Explosion.MyRect.x], [pExplosion+Explosion.MyRect.y], 
 						[pExplosion+Explosion.MyRect.width], [pExplosion+Explosion.MyRect.height], 
 						[pExplosion+Explosion.hDcBmpMask],

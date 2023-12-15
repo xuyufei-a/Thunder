@@ -145,11 +145,11 @@ SPEED_ENEMY_BULLET		EQU		1
 ;=========local struct define========
 MyRect STRUCT 
 ; position
-	x		SWORD ?
-	y		SWORD ?
+	x		SDWORD ?
+	y		SDWORD ?
 ; size
-	width	SWORD ?
-	height	SWORD ?
+	widt	SDWORD ?
+	height	SDWORD ?
 MyRect ENDS
 
 Bullet STRUCT
@@ -166,20 +166,20 @@ Plane STRUCT
 ; position
 	rect		MyRect <>
 ; speed
-	xSpeed		SWORD ?
-	ySpeed		SWORD ?
+	xSpeed		SDWORD ?
+	ySpeed		SDWORD ?
 ; bmpimage
 	hDcBmp		DWORD ?
 	hDcBmpMask	DWORD ?
-	width		SWORD ?
-	height		SWORD ?
+	widt		SDWORD ?
+	height		SDWORD ?
 ; the countdown for next emit bullet
-	nextEmitCountdown	SWORD ?
+	nextEmitCountdown	SDWORD ?
 Plane ENDS
 		
 PlayerPlane STRUCT
 	plane		Plane <>
-	health		DWORD ?
+	health		SDWORD ?
 PlayerPlane ENDS
 
 Explosion STRUCT
@@ -189,7 +189,7 @@ Explosion STRUCT
 	hDcBmp		DWORD ?
 	hDcBmpMask	DWORD ?
 ; remianing duration
-	duration	DWORD ?
+	duration	SDWORD ?
 Explosion ENDS
 
 ; ===================data========================
