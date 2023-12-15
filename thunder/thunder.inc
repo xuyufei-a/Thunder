@@ -11,51 +11,72 @@
 
 ;-------------function for GSTATUS_GAME status--------------
 ; function for painting
-	DrawPlane PROTO :DWORD
-	DrawBullet PROTO :DWORD
-	DrawExplosion	PROTO: DWORD
+	InitDC	PROTO
+	DeleteDC PROTO
+	DrawPlane PROTO
+	DrawBullet PROTO
+	DrawExplosion	PROTO
 	DrawBackground PROTO
 	DrawGameScene PROTO
 
 ; function for logic, such as collision dectection, calculating next position
+	; function for initailize
+	InitGame	PROTO	:DWORD				; pamameter is the number of players(1 or 2)
 	; function used when timer expires
-	CheckIlligal PROTO :RECT			; check if the rect is in the window
-	CheckIntersection PROTO :RECT, :RECT
-	SolveCollision PROTO				; remove bullets and planes that collide with others
-	CalNextPos	PROTO					; iterate enemy planes queue and bullet queue, cal their next position
+	CheckIlligal PROTO :DWORD				; check if the rect is in the window, parameter is the address of the rect
+	CheckIntersection PROTO :DOWRD, :DWORD	; check if the two rects intersect, parameters are the address of the two rects
+	SolveCollision PROTO					; remove bullets and planes that collide with others
+	CalNextPos	PROTO						; iterate enemy planes queue and bullet queue, cal their next position
 
 	; function used for iteract
-	EmitBullet PROTO :DWORD				; the pamameter notify which player
-	MovPlayerPlane PROTO :DWORD, :DWORD  ; the pamameters are PlayerPlane address and direction(left or right)	
+	EmitBullet PROTO						; the pamameter notify which player
 	
 	
-	
-
+	; function to manipulate circular queue
+	InitQueue PROTO
+	PushBullet PROTO :DWORD
+	PopBullet PROTO
+	GetBulletFront PROTO
+	PushPlane PROTO :DWORD
+	PopPlane PROTO
+	GetPlaneFront PROTO
+	PushExplosion PROTO :DWORD
+	PopExplosion PROTO
+	GetExplosionFront PROTO
 
 ;=========local struct define========
+MyRect STRUCT 
+; position
+	x		SWORD ?
+	y		SWORD ?
+; size
+	width	SWORD ?
+	height	SWORD ?
+MyRect ENDS
+
 Bullet STRUCT
 ; position
-    x			DWORD ?
-	y			DWORD ?
-	rect		RECT <>
+	rect		MyRect <>
 ; speed
-	xSpeed		DWORD ?
-	ySpeed		DWORD ?
+	xSpeed		SWORD ?
+	ySpeed		SWORD ?
 ; color, up to which camp it belongs
-	color		DWORD ?
+	color		D	WORD ?
 Bullet ENDS
 
 Plane STRUCT
 ; position
-	x			DWORD ?
-	y			DWORD ?
-	rect		RECT <>
+	rect		MyRect <>
 ; speed
-	xSpeed		DWORD ?
-	ySpeed		DWORD ?
+	xSpeed		SWORD ?
+	ySpeed		SWORD ?
 ; bmpimage
-	hBmp		DWORD ?
-	hBmpMask	DWORD ?
+	hDcBmp		DWORD ?
+	hDcBmpMask	DWORD ?
+	width		SWORD ?
+	height		SWORD ?
+; the countdown for next emit bullet
+	nextEmitCountdown	SWORD ?
 Plane ENDS
 		
 PlayerPlane STRUCT
@@ -65,10 +86,12 @@ PlayerPlane ENDS
 
 Explosion STRUCT
 ; position 
-	rect		RECT <>
+	rect		MyRect <>
 ; bmpimage
-	hBmp		DWORD ?
-	hBmpMask	DWORD ?
+	hDcBmp		DWORD ?
+	hDcBmpMask	DWROD ?
+; remianing duration
+	duration	DWORD ?
 Explosion ENDS
 
 ; function for logic, such as collision detection, calulating next position
@@ -129,22 +152,69 @@ KEY_ENTER			EQU		13
 QUEUE_SIZE			EQU		1024
 
 
+; bullet color, notify which camp it belongs
+BULLET_COLOR_PLAYER	EQU		0x000000FF		 
+BULLET_COLOR_ENEMY	EQU		0x00FF0000 
+
+
+
+; some const for game logic
+
+; time const
+PLAYER_EMIT_INTERVAL	EQU		10
+ENEMY_EMIT_INTERVAL		EQU		100
+EXPLOSION_DURATION		EQU		10
+
+
+; size const
+PLAYER_PLANE_WIDTH		EQU		50
+
+
+BULLET_WIDTH			EQU		5
+BULLET_HEIGHT			EQU		10
+
+
+; pos const 
+
+P1_BIRTH_POINT_X		EQU		100
+P2_BIRTH_POINT_X		EQU     200
+
 .data 
 szDisplayName	DB "Thunder"
 
 hInstance		DWORD ?	; 创建当前进程的文件的句柄
-hIcon			DWORD ?	; 当前窗口的图标
 hMainWnd		DWORD ? ; 窗口的句柄
 
 gameStatus		DWORD 1 ; 当前游戏所处的状态
 
+
+; game resource handles 
+hIcon				DWORD ?	; 当前窗口的图标
+hDc					DWORD ?	; 当前窗口的设备环境
+hBmp				DWORD ?
+hMemDc				DWORD ? ; 内存设备环境
+hDcExplosion1		DWORD ?
+hDcExplosion1Mask	DWORD ?
+hDcPlayerPlane1		DWORD ?
+hDcPlayerPlane1Mask	DWORD ?
+hDcPlayerPlane2		DWORD ?
+hDcPlayerPlane2Mask	DWORD ?
+hDcEnemyPlane1		DWORD ?
+hDcEnemyPlane1Mask	DWORD ?
+
 ; circular queue for bullets and planes
-bullets		    Bullet QUEUE_SIZE dup(<>)
-bulletQueueHead	DWORD ?
-bulletQueueTail DWORD ?
-planes			Plane QUEUE_SIZE dup(<>)   ; enemy planes
-planeQueueHead	DWORD ?
-planeQueueTail  DWORD ?
+bullets				Bullet QUEUE_SIZE dup(<>)
+bulletQueueHead		DWORD ?
+bulletQueueTail		DWORD ?
+bulletQueueSize		DWORD ?
+planes				Plane QUEUE_SIZE dup(<>)   ; enemy planes
+planeQueueHead		DWORD ?
+planeQueueTail		DWORD ?
+planeQueueSize		DWORD ?
+explosions			Explosion QUEUE_SIZE dup(<>)
+explosionQueueHead	DWORD ?
+explosionQueueTail	DWORD ?
+explosionQueueSize	DWORD ?
 
 ; player planes
 p1Plane			PlayerPlane <>
@@ -154,6 +224,6 @@ p2Plane			PlayerPlane <>
 aKeyHold			DWORD 0
 dKeyHold			DWORD 0
 spacebarKeyHold		DWORD 0
-upKeyHold			DOWRD 0
-downKeyHold			DOWRD 0
+leftKeyHold			DOWRD 0
+rightKeyHold		DOWRD 0
 enterKeyHold		DWORD 0

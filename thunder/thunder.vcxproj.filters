@@ -23,6 +23,9 @@
     <None Include="thunder.inc">
       <Filter>头文件</Filter>
     </None>
+    <None Include="resource.inc">
+      <Filter>头文件</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="resource.h">
@@ -36,6 +39,48 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="icon1.ico">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="image\boom01.bmp">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="image\boom01_mask.bmp">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="image\boom02.bmp">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="image\boom02_mask.bmp">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="image\boom03.bmp">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="image\boom03_mask.bmp">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="image\enemy1.bmp">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="image\enemy1_mask.bmp">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="image\enemy2.bmp">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="image\enemy2_mask.bmp">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="image\player1.bmp">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="image\player1_mask.bmp">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="image\player2.bmp">
+      <Filter>资源文件</Filter>
+    </Image>
+    <Image Include="image\player2_mask.bmp">
       <Filter>资源文件</Filter>
     </Image>
   </ItemGroup>

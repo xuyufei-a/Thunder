@@ -94,6 +94,7 @@ WinMain PROC
 
 	ExitLoop:
 		invoke ExitProcess, 0
+	ret
 WinMain ENDP
 
 ; ########################################################################
@@ -127,10 +128,10 @@ GameProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
 			mov aKeyHold, True
 		.elseif wParam == KEY_D
 			mov dKeyHold, True
-		.elseif wParam == KEY_UPARROW
-			mov upKeyHold, True
-		.elseif wParam == KEY_DOWNARROW
-			mov downKeyHold, True
+		.elseif wParam == KEY_LEFTARROW
+		    mov leftKeyHold, True
+		.elseif wParam == KEY_RIGHTARROW
+			mov rightKeyHold, True	
 		.elseif wParam == KEY_SPACE
 			mov spaceKeyHold, True
 		.elseif wParam == KEY_ENTER
@@ -143,10 +144,10 @@ GameProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
 			mov aKeyHold, False
 		.elseif wParam == KEY_D
 			mov dKeyHold, False
-		.elseif wParam == KEY_UPARROW
-			mov upKeyHold, False
-		.elseif wParam == KEY_DOWNARROW
-			mov downKeyHold, False
+		.elseif wParam == KEY_LEFTARROW
+			mov leftKeyHold, False
+		.elseif wParam == KEY_RIGHTARROW
+			mov rightKeyHold, False
 		.elseif wParam == KEY_SPACE
 			mov spaceKeyHold, False
 		.elseif wParam == KEY_ENTER
@@ -163,32 +164,518 @@ GameProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
 	.elseif uMsg == WM_TIMER
 		invoke SolveCollision
 		invoke CalNextPos
+		invoke EmitBullet
 	.endif
 				
 	invoke DefWindowProc, hWin, uMsg, wParam, lParam
 	ret
 GameProc ENDP
 ; ########################################################################
-CalNextPos PROC
-	; loop iterate all the bullets in the circular queue
-		
-	Loop:	
-		
-	Test:
+EmitBullet PROC
+	local planeCount : DWORD
+	local pPlane	 : DWORD
+	local pBullet	 : DWORD
+
+	; enemy planes emit bullets
+	m2m planeCount, planeQueueSize
+	.while planeCount > 0
+		invoke getPlaneFront
+		mov pPlane, eax
+		invoke popPlane
+
+		mov eax, [pPlane+PlayerPlane.Plane.nextEmitCountdown]
+		dec eax
+		.if eax == 0
+			; tobedone init bullet position
+			m2m [pBullet+Bullet.MyRect.x], [pPlane+Plane.MyRect.x]
+			m2m [pBullet+Bullet.MyRect.y], [pPlane+Plane.MyRect.y]
+
+			mov [pBullet+Bullet.MyRect.width], BULLET_WIDTH
+			mov [pBullet+Bullet.MyRect.height], BULLET_HEIGHT
+			mov [pBullet+Bullet.xSpeed], 0
+			mov [pBullet+Bullet.ySpeed], BULLET_SPEED
+			mov [pBullet+Bullet.color], BULLET_COLOR_ENEMY
+			invoke PushBullet, pBullet
+
+			mov eax, ENEMY_EMIT_INTERVAL
+		.endif
+		mov [pPlane+PlayerPlane.Plane.nextEmitCountdown], eax]	
+	.endw
+
+	; player planes emit bullets
+	.if DWORD PTR [p1Plane+playerPlane.health] > 0
+		dec [p1Plane+PlayerPlane.Plane.nextEmitCountdown]
+		.if spacebarKeyHold == True
+		.if DWORD PTR [p1Plane+PlayerPlane.Plane.nextEmitCountdown] <= 0
+			; tobedone init bullet position
+			m2m [pBullet+Bullet.MyRect.x], [p1Plane+PlayerPlane.MyRect.x]
+			m2m [pBullet+Bullet.MyRect.y], [p1Plane+PlayerPlane.MyRect.y]
+
+			mov [pBullet+Bullet.MyRect.width], BULLET_WIDTH
+			mov [pBullet+Bullet.MyRect.height], BULLET_HEIGHT
+			mov [pBullet+Bullet.xSpeed], 0
+			mov [pBullet+Bullet.ySpeed], -BULLET_SPEED
+			mov [pBullet+Bullet.color], BULLET_COLOR_PLAYER
+			invoke PushBullet, pBullet
 			
+			mov DWORD PTR [p1Plane+PlayerPlane.Plane.nextEmitCountdown], PLAYER_EMIT_INTERVAL]
+		.endif
+		.endif
+	.endif
+	
+	.if DWORD PTR [p2Plane+playerPlane.health] > 0
+		dec [p2Plane+PlayerPlane.Plane.nextEmitCountdown]
+		.if enterKeyHold == True
+		.if DWORD PTR [p2Plane+PlayerPlane.Plane.nextEmitCountdown] <= 0
+			; tobedone init bullet position
+			m2m [pBullet+Bullet.MyRect.x], [p2Plane+PlayerPlane.MyRect.x]
+			m2m [pBullet+Bullet.MyRect.y], [p2Plane+PlayerPlane.MyRect.y]
+
+			mov [pBullet+Bullet.MyRect.width], BULLET_WIDTH
+			mov [pBullet+Bullet.MyRect.height], BULLET_HEIGHT
+			mov [pBullet+Bullet.xSpeed], 0
+			mov [pBullet+Bullet.ySpeed], -BULLET_SPEED
+			mov [pBullet+Bullet.color], BULLET_COLOR_PLAYER
+			invoke PushBullet, pBullet
+			
+			mov DWORD PTR [p2Plane+PlayerPlane.Plane.nextEmitCountdown], PLAYER_EMIT_INTERVAL]
+		.endif
+		.endif
+	.endif
+	ret
+EmitBullet ENDP
+; ########################################################################
+CheckIntersection PROC pRect1: DWORD, pRect2: DWORD
+	local l1	: SWORD
+	local r1	: SWORD
+	local t1	: SWORD
+	local b1	: SWORD
+	local l2	: SWORD
+	local r2	: SWORD
+	local t2	: SWORD
+	local b2	: SWORD
+
+	mov eax, True
+
+	mov si, SWORD PTR [pRect1+MyRect.x]
+	mov di, SWORD PTR [pRect1+MyRect.y]
+	mov l1, si
+	mov t1, di
+	add si, SWORD PTR [pRect1+MyRect.width]
+	add di, SWORD PTR [pRect1+MyRect.height]
+	mov r1, si
+	mov b1, di
+
+	mov si, SWORD PTR [pRect2+MyRect.x]
+	mov di, SWORD PTR [pRect2+MyRect.y]
+	mov l2, si
+	mov t2, di
+	add si, SWORD PTR [pRect2+MyRect.width]
+	add di, SWORD PTR [pRect2+MyRect.height]
+	mov r2, si
+	mov b2, di
+
+	.if l1 > r2
+		mov eax, False
+	.elseif r1 < l2
+		mov eax, False
+	.elseif t1 > b2
+		mov eax, False
+	.elseif b1 < t2
+		mov eax, False
+	.endif
+
+	ret
+CheckIntersection ENDP
+; ########################################################################
+SolveCollision PROC
+; -----------------------
+; solve collision between bullets and planes, enemy planes and player planes
+
+; iterate the bullets queue and check if there is any collision beteen the plane
+; if the bullet belones to the player, then check if there is any collision between
+; the enemy plane and the bullet; if the bullet belongs to the enemy, then check if there is any
+; collision between the player plane and bullet
+; if there is a collision, then delete the bullet and the plane,
+; and add an explosion to the corresponding place
+
+	local bulletsCount	: DWORD
+	local planesCount	: DWORD
+	local pBullet		: DWORD
+	local pPlane		: DWORD
+	local bulletColor   : WORD
+	local flag 		    : WORD
+
+	m2m bulletsCount, bulletQueueSize
+
+	.while bulletsCount > 0
+		; get the bullet at the queue front
+		invoke GetBulletFront
+		mov pBullet, eax
+		invoke PopBullet
+		m2m bulletColor, DWORD PTR [pBullet+Bullet.color]
+		mov flag, False									; flag to indicate if the bullet is deleted
+		
+
+		; iterate the planes and check collision
+		.if bulletColor == BULLET_COLOR_PLAYER			; bullet belongs to player
+
+			m2m planesCount, planeQueueSize
+			.while planesCount > 0
+				invoke GetPlaneFront
+				mov pPlane, eax
+				invoke PopPlane
+
+				invoke CheckIntersection, pBullet, pPlane
+				.if eax == True
+					invoke PushExplosion, pPlane
+					mov flag, True	
+					; tobedone add score
+				.endif
+
+				.if flag == False
+					invoke PushPlane
+				.endif 
+
+				.break .if flag == True					; bullet can only hit one plane
+				dec planesCount
+			.endw
+		.elseif bulletColor == BULLET_COLOR_ENEMY
+			m2m pPlane, offset p1Plane
+			
+			.if flag == True
+			    goto @F
+			endif
+			mov eax, [pPlane+PlayerPlane.health]
+			.if eax == 0
+			    got @F
+			endif
+
+			invoke CheckIntersection, pBullet, pPlane	
+			.if eax == True
+				invoke PushExplosion, pPlane
+				mov flag, True
+				dec [pPlane+PlayerPlane.health]
+				; tobedone relocate the rebirth point
+				mov [pPlane+PlayerPlane.Plane.MyRect.x], P1_BIRTH_POINT_X
+			.endif
+		@@:
+			m2m pPlane, offset p2Plane
+			
+			.if flag == True
+			    jmp @F
+			endif
+			mov eax, [pPlane+PlayerPlane.health]
+			.if eax == 0
+			    jmp @F
+			endif
+
+			invoke CheckIntersection, pBullet, pPlane	
+			.if eax == True
+				invoke PushExplosion, pPlane
+				mov flag, True
+				dec [pPlane+PlayerPlane.health]
+				mov [pPlane+PlayerPlane.Plane.MyRect.x], P2_BIRTH_POINT_X
+			.endif
+		@@:
+		.endif
+
+		; if there is no collison, push the bullet back
+		.if flag == False
+			invoke PushBullet, pBullet
+		.endif 
+		dec bulletsCount
+	.endw
+
+
+SolveCollision ENDP
+; ########################################################################
+CheckIllegal PROC pRect: DWORD
+	mov eax, True
+	mov si, SWORD PTR [pRect+MyRect.x]
+	mov di, SWORD PTR [pRect+MyRect.y]
+	
+	.if si < 0
+		mov eax, False
+	.elseif di < 0
+		mov eax, False
+	.endif
+
+	add si, WORD PTR [pRect+MyRect.width]
+	add di, WORD PTR [pRect+MyRect.height]
+
+	.if si > WINDOW_WIDTH
+		mov eax, False
+	.elseif di > WINDOW_HEIGHT
+		mov eax, False
+	.endif
+
+	ret
+CheckIllegal ENDP
+; ########################################################################
+CalNextPos PROC
+	local bulletsCount	: DWORD	
+	local planesCount	: DWORD
+	local pBullet		: DWORD
+	local pPlane		: DOWRD
+
+	m2m bulletsCount, bulletQueueSize
+	m2m planesCount, planeQueueSize
+
+	; loop iterate all the bullets in the circular queue
+	.while bulletsCount > 0
+		invoke GetBulletFront
+		mov pBullet, eax
+		invoke PopBullet
+
+		mov ax, SWORD PTR [pBullet+Bullet.rect.x]
+		add ax, SWORD PTR [pBullet+Bullet.xSpeed]
+		mov SWORD PTR [pBullet+Bullet.rect.x], ax
+		mov ax, SWORD PTR [pBullet+Bullet.rect.y]
+		add ax, SWORD PTR [pBullet+Bullet.ySpeed]
+		mov SWORD PTR [pBullet+Bullet.rect.y], ax
+		invoke CheckIllegal, pBullet
+		.if eax == True
+			invoke PushBullet, pBullet
+		.endif
+
+		dec bulletsCount
+	.endw
+
+	; loop iterate all the planes in the circular queue
+	.while planesCount > 0
+		invoke GetPlaneFront
+		mov pPlane, eax
+		invoke PopPlane
+
+		mov ax, SWORD PTR [pPlane+Plane.rect.x]
+		add ax, SWORD PTR [pPlane+Plane.xSpeed]
+		mov SWORD PTR [pPlane+Plane.rect.x], ax
+		mov ax, SWORD PTR [pPlane+Plane.rect.y]
+		add ax, SWORD PTR [pPlane+Plane.ySpeed]
+		mov SWORD PTR [pPlane+Plane.rect.y], ax
+		invoke CheckIllegal, pPlane
+		.if eax == True
+			invoke PushPlane, pPlane
+		.endif
+
+		dec planesCount
+	.endw
+
+	; cal player plane's next position
+	
+	.if aKeyHold == True
+		mov ax, SWORD PTR [p1Plane+PlayerPlane.rect.x]
+		sub ax, [p1Plane+PlayerPlane.plane.xSpeed]
+		.if ax < 0
+			mov ax, 0
+		.endif
+		mov SWORD PTR [p1Plane+PlayerPlane.rect.x], ax
+	.endif
+	
+	.if dKeyHold == True
+		mov ax, SWORD PTR [p1Plane+PlayerPlane.rect.x]
+		add ax, [p1Plane+PlayerPlane.plane.xSpeed]
+		.if ax + PLAYER_PLANE_WIDTH > WINDOW_WIDTH
+			mov ax, WINDOW_WIDTH - PLAYER_PLANE_WIDTH
+		.endif
+		mov SWORD PTR [p1Plane+PlayerPlane.rect.x], ax
+	.endif
+
+	.if leftKeyHold == True
+		mov ax, SWORD PTR [p2Plane+PlayerPlane.rect.x]
+		sub ax, [p2Plane+PlayerPlane.plane.xSpeed]
+		.if ax < 0
+			mov ax, 0
+		.endif
+		mov SWORD PTR [p2Plane+PlayerPlane.rect.x], ax
+	.endif
+
+	.if rightKeyHold == True
+		mov ax, SWORD PTR [p2Plane+PlayerPlane.rect.x]
+		add ax, [p2Plane+PlayerPlane.plane.xSpeed]
+		.if ax + PLAYER_PLANE_WIDTH > WINDOW_WIDTH
+			mov ax, WINDOW_WIDTH - PLAYER_PLANE_WIDTH
+		.endif
+		mov SWORD PTR [p2Plane+PlayerPlane.rect.x], ax
+	.endif
 
 CalNextPos ENDP
 ; ########################################################################
 SuspendProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
 	
-	;.if 
 	
 
 
 
 SuspendProc ENDP
 ; ########################################################################
+InitQueue PROC
+	mov bulletQueueHead, 0
+	mov bulletQueueTail, 0
+	mov bulletQueueSize, 0
+	mov planeQueueHead, 0
+	mov planeQueueTail, 0
+	mov planeQueueSize, 0
+	mov explosionQueueHead, 0
+	mov explosionQueueTail, 0
+	mov explosionQueueSize, 0
+	ret
+InitQueue ENDP
+; ########################################################################
+PushBullet PROC pBullet:DWORD
+	.if bulletQueueSize == QUEUE_SIZE
+		ret
+	.endif
 
+	; move the source ptr to esi and the destination ptr to edi
+	mov eax, bulletQueueTail
+	mov ecx, sizeof Bullet
+	mul ecx
+	add eax, offset bulletQueue
+
+	; use rep movsb to copy the bullet to the queue
+	mov esi, pBullet
+	mov edi, eax
+	cld
+	rep movsb
+	
+	; update the tail and size
+	inc bulletQueueSize
+	inc bulletQueueTail
+	.if bulletQueueTail == QUEUE_SIZE
+		mov bulletQueueTail, 0
+	.endif
+	ret
+PushBullet ENDP
+; ########################################################################
+PopBullet PROC
+	.if bulletQueueSize == 0
+		ret
+	.endif
+	
+	dec bulletQueueSize
+	inc bulletQueueHead
+	.if bulletQueueHead == QUEUE_SIZE
+		mov bulletQueueHead, 0
+	.endif
+	ret
+PopBullet ENDP
+; ########################################################################
+GetBulletFront PROC
+    ;-------------warning-----------------
+	; this function will not check if the queue is empty
+
+	mov eax, bulletQueueHead
+	mov ecx, sizeof Bullet
+	mul ecx
+	add eax, offset bulletQueue
+	ret
+; ########################################################################
+PushPlane PROC pPlane:DWORD
+	.if planeQueueSize == QUEUE_SIZE
+		ret
+	.endif
+
+	; move the source ptr to esi and the destination ptr to edi
+	mov eax, planeQueueTail
+	mov ecx, sizeof Plane
+	mul ecx
+	add eax, offset planeQueue
+
+	; use rep movsb to copy the plane to the queue
+	mov esi, pPlane
+	mov edi, eax
+	cld
+	rep movsb
+	
+	; update the tail and size
+	inc planeQueueSize
+	inc planeQueueTail
+	.if planeQueueTail == QUEUE_SIZE
+		mov planeQueueTail, 0
+	.endif
+	ret
+PushPlane ENDP
+; ########################################################################
+PopPlane PROC
+	.if planeQueueSize == 0
+		ret
+	.endif
+	
+	dec planeQueueSize
+	inc planeQueueHead
+	.if planeQueueHead == QUEUE_SIZE
+		mov planeQueueHead, 0
+	.endif
+	ret
+PopPlane ENDP
+; ########################################################################
+GetPlaneFront PROC
+	;-------------warning-----------------
+	; this function will not check if the queue is empty
+
+	mov eax, planeQueueHead
+	mov ecx, sizeof Plane
+	mul ecx
+	add eax, offset planeQueue
+	ret
+GetPlaneFront ENDP
+; ########################################################################
+PushExplosion PROC pRect:DWORD
+	.if explosionQueueSize == QUEUE_SIZE
+		ret
+	.endif
+
+	; move the source ptr to esi and the destination ptr to edi
+	mov eax, explosionTail
+	mov ecx, sizeof Explosion
+	mul ecx
+	add eax, offset explosionQueue
+
+	; init duration for a new explosion
+	mov DWORD PTR [eax+Explosion.duration], EXPLOSION_DURATION
+
+	; use rep movsb to copy the rect to the queue
+	mov ecx, sizeof MyRect
+	mov esi, pRect
+	mov edi, eax
+	cld
+	rep movsb
+	
+	; update the tail and size
+	inc explosionQueueSize
+	inc explosionQueueTail
+	.if explosionQueueTail == QUEUE_SIZE
+		mov explosionQueueTail, 0
+	.endif
+	ret
+PushExplosion ENDP
+; ########################################################################
+PopExplosion PROC
+	.if explosionQueueSize == 0
+		ret
+	.endif
+	
+	dec explosionQueueSize
+	inc explosionQueueHead
+	.if explosionQueueHead == QUEUE_SIZE
+		mov explosionQueueHead, 0
+	.endif
+	ret
+PopExplosion ENDP
+; ########################################################################
+GetExplosionFront PROC
+	;-------------warning-----------------
+	; this function will not check if the queue is empty
+
+	mov eax, explosionQueueHead
+	mov ecx, sizeof Explosion
+	mul ecx
+	add eax, offset explosionQueue
+	ret
+GetExplosionFront ENDP
+; ########################################################################
 TopXY PROC wDim:DWORD, sDim:DWORD
 
     shr sDim, 1      ; divide screen dimension by 2
@@ -199,7 +686,267 @@ TopXY PROC wDim:DWORD, sDim:DWORD
     return sDim
 
 TopXY ENDP
+; #########################################################################
+DrawGameScene PROTO
+	local ps	:PAINTSTRUCT
 
+	invoke DrawBackgound
+	invoke DrawPlane
+	invoke DrawBullet
+	invoke DrawExplosion
+
+	; tobedone maybe add beginpaint and endpaint
+	invoke BeginPaint, hMainWnd, ADDR ps
+	mov hDC, eax
+
+	invoke BitBlt, hDC, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, hMemDC, 0, 0, SRCCOPY
+
+	invoke EndPaint, hMainWnd, ADDR ps
+
+	; need to realease DC?
+	ret
+DrawGameScene ENDP
+; #########################################################################
+DrawPlane PROTO
+	local planeCount : DWORD
+	local pPlane	 : DWORD
+
+	; draw enemy plane
+	m2m planeCount, planeQueueSize
+	.while planeCount > 0
+		invoke GetPlaneFront
+		mov pPlane, eax
+		invoke PopPlane
+		
+		invoke StrenchBlt, hMemDc, [pPlane+Plane.MyRect.x], [pPlane+Plane.MyRect.y],
+						[pPlane+Plane.MyRect.width], [pPlane+Plane.MyRect.height], 
+						[pPlane+Plane.hDcBmpMsk], 0, 0, 
+						[pPlane+Plane.width], [pPlane+Plane.height], SRCSAND
+		
+		invoke StrenchBlt, hMemDc, [pPlane+Plane.MyRect.x], [pPlane+Plane.MyRect.y],
+						[pPlane+Plane.MyRect.width], [pPlane+Plane.MyRect.height], 
+						[pPlane+Plane.hDcBmp], 0, 0, 
+						[pPlane+Plane.width], [pPlane+Plane.height], SRCSPAND
+
+		invoke PushPlane, pPlane
+		dec planeCount
+	.endw
+
+	; draw player plane
+	.if p1Plane.health > 0
+		mov pPlane, offset p1Plane
+
+		invoke StrenchBlt, hMemDc, [pPlane+Plane.MyRect.x], [pPlane+Plane.MyRect.y],
+						[pPlane+Plane.MyRect.width], [pPlane+Plane.MyRect.height], 
+						[pPlane+Plane.hDcBmpMsk], 0, 0, 
+						[pPlane+Plane.width], [pPlane+Plane.height], SRCSAND
+		
+		invoke StrenchBlt, hMemDc, [pPlane+Plane.MyRect.x], [pPlane+Plane.MyRect.y],
+						[pPlane+Plane.MyRect.width], [pPlane+Plane.MyRect.height], 
+						[pPlane+Plane.hDcBmp], 0, 0, 
+						[pPlane+Plane.width], [pPlane+Plane.height], SRCSPAND
+	.endif
+	.if p2Plane.health > 0
+		mov pPlane, offset p2Plane
+
+		invoke StrenchBlt, hMemDc, [pPlane+Plane.MyRect.x], [pPlane+Plane.MyRect.y],
+						[pPlane+Plane.MyRect.width], [pPlane+Plane.MyRect.height], 
+						[pPlane+Plane.hDcBmpMsk], 0, 0, 
+						[pPlane+Plane.width], [pPlane+Plane.height], SRCSAND
+		
+		invoke StrenchBlt, hMemDc, [pPlane+Plane.MyRect.x], [pPlane+Plane.MyRect.y],
+						[pPlane+Plane.MyRect.width], [pPlane+Plane.MyRect.height], 
+						[pPlane+Plane.hDcBmp], 0, 0, 
+						[pPlane+Plane.width], [pPlane+Plane.height], SRCSPAND
+	.endif
+	ret
+DrawPlane ENDP
+; #########################################################################
+DrawBullet PROTO
+	local bulletCount		: DWORD
+	local pBullet			: DWORD
+	local enemyBulletBrush	: DWORD
+	local playerBulletBrush : DWORD
+	local left				: SDWORD
+	local top				: SDWORD
+	local right				: SDWORD	
+	local bottom			: SDWORD
+
+	invoke CreateSolidBrush, BULLET_COLOR_ENEMY
+	mov enemyBulletBrush, eax
+	invoke CreateSolidBrush, BULLET_COLOR_PLAYER
+	mov playerBulletBrush, eax
+
+	m2m bulletCount, bulletQueueSize
+	.while bulletCount > 0
+		invoke GetBulletFront
+		mov pBullet, eax
+		invoke PopBullet
+		
+		.if DWORD PTR [pBullet+Bullet.color] == BULLET_COLOR_ENEMY
+			invoke SelectObject, hMemDC, enemyBulletBrush
+		.elseif DWORD PTR [pBullet+Bullet.color] == BULLET_COLOR_PLAYER
+			invoke SelectObject, hMemDC, playerBulletBrush
+		.endif
+		
+		movsx left, SWORD PTR [pBullet+Bullet.MyRect.x]
+		movsx top, SWORD PTR [pBullet+Bullet.MyRect.y]
+		movsx eax, SWORD PTR [pBullet+Bullet.MyRect.width]
+		add eax, left
+		mov right, eax
+		movsx eax, SWORD PTR [pBullet+Bullet.MyRect.height]
+		add eax, top
+		mov bottom, eax
+
+		invoke Rectangle, hMemDC, left, top, right, bottom
+
+		invoke PushBullet, pBullet
+		dec bulletCount
+	.endw
+
+	invoke DeleteObject, enemyBulletBrush
+	invoke DeleteObject, playerBulletBrush
+	ret
+DrawBullet ENDP
+; #########################################################################
+DrawExplosion PROTO
+	local explosionCount	: DWORD
+	local pExplosion		: DWORD
+
+	m2m explosionCount, explosionQueueSize
+	.while explosionCount > 0
+		dec explosionCount
+		invoke GetExplosionFront
+		mov pExplosion, eax
+		invoke PopExplosion
+
+		dec [pExplosion+Explosion.duration]
+		.continue .if [pExplosion+Explosion.duration] == 0	; it the explosion expires
+		
+		invoke StrenchBlt, hMemDc, 
+						[pExplosion+Explosion.MyRect.x], [pExplosion+Explosion.MyRect.y], 
+						[pExplosion+Explosion.MyRect.width], [pExplosion+Explosion.MyRect.height], 
+						[pExplosion+Explosion.hDcBmpMask],
+						0, 0,
+						BMP_SIZE_BOOM_SIZE, BMP_SIZE_BOOM_SIZE, SRCAND
+
+		invoke StrenchBlt, hMemDc, 
+						[pExplosion+Explosion.MyRect.x], [pExplosion+Explosion.MyRect.y], 
+						[pExplosion+Explosion.MyRect.width], [pExplosion+Explosion.MyRect.height], 
+						[pExplosion+Explosion.hDcBmpMask],
+						0, 0,
+						BMP_SIZE_BOOM_SIZE, BMP_SIZE_BOOM_SIZE, SRCPAINT
+
+		invoke PushExplosion, pExplosion
+	.endw
+	ret
+; #########################################################################
+DrawBackground PROTO
+	local brush		:DWORD
+	local wndRect	:RECT
+
+	invoke GetDC, hMainWnd
+	mov hDC, eax
+	; »­ÉÏºÚÉ«±³¾°
+	invoke CreateSolidBrush, COLOR_BLACK
+	mov brush, eax
+	invoke GetClientRect, hMainWnd, ADDR wndRect
+	
+	invoke FillRect	hDC, ADDR wndRect, brush
+	
+	; tobedone may be a picture background
+	
+	invoke RealeaseDC, hMainWnd, hDC
+	ret
+DrawBackground ENDP
+; #########################################################################
+InitDC PROTO 
+	; this function create memory DC and DCs for resources
+    ; they should be delete when program exit
+
+	; get system DC
+	invoke GetDC, hMainWnd
+	mov hDC, eax
+
+	; create a memory DC
+	invoke CreateCompatibleDC, hDC
+	mov hMemDC, eax
+	invoke CreateCompatibleBitmap, hDC, WINDOW_WIDTH, WINDOW_HEIGHT
+	mov hBmp, eax
+	invoke SelectObject, hMemDC, hBmp
+	invoke DeleteObject, hBmp
+
+	; create resource DC
+
+	; explosion and its mask
+	invoke CreateCompatibleDC, hDC
+	mov hDcExplosion1, eax
+    invoke LoadBitmap, hInstance, BMP_BOOM1
+	mov hBmp, eax
+	invoke SelectObject, hDcExplosion1, hBmp
+	invoke DeleteObject, hBmp
+
+	invoke CreateCompatibleDC, hDC
+	mov hDcExplosion1Mask, eax
+	invoke LoadBitmap, hInstance, BMP_BOOM1_MASK
+	mov hBmp, eax
+	invoke SelectObject, hDcExplosion1Mask, hBmp
+	invoke DeleteObject, hBmp
+
+	; enemy plane and its mask
+	invoke CreateCompatibleDC, hDC
+	mov hDcEnemyPlane1, eax
+	invoke LoadBitmap, hInstance, BMP_ENEMY1
+	mov hBmp, eax
+	invoke SelectObject, hDcEnemyPlane1, hBmp
+	invoke DeleteObject, hBmp
+
+	invoke CreateCompatibleDC, hDC
+	mov hDcEnemyPlane1Mask, eax
+	invoke LoadBitmap, hInstance, BMP_ENEMY1_MASK
+	mov hBmp, eax
+	invoke SelectObject, hDcEnemyPlane1Mask, hBmp
+	invoke DeleteObject, hBmp
+
+	; player plane and its mask
+	; palyer1
+	invoke CreateCompatibleDC, hDC
+	mov hDcPlayerPlane1, eax
+	invoke LoadBitmap, hInstance, BMP_PLAYER1
+	mov hBmp, eax
+	invoke SelectObject, hDcPlayerPlane1, hBmp
+	invoke DeleteObject, hBmp
+
+	invoke CreateCompatibleDC, hDC
+	mov hDcPlayerPlane1Mask, eax
+	invoke LoadBitmap, hInstance, BMP_PLAYER1_MASK
+	mov hBmp, eax
+	invoke SelectObject, hDcPlayerPlane1Mask, hBmp
+	invoke DeleteObject, hBmp
+
+	; player2
+	invoke CreateCompatibleDC, hDC
+	mov hDcPlayerPlane2, eax
+	invoke LoadBitmap, hInstance, BMP_PLAYER2
+	mov hBmp, eax
+	invoke SelectObject, hDcPlayerPlane2, hBmp
+	invoke DeleteObject, hBmp
+
+	invoke CreateCompatibleDC, hDC
+	mov hDcPlayerPlane2Mask, eax
+	invoke LoadBitmap, hInstance, BMP_PLAYER2_MASK
+	mov hBmp, eax
+	invoke SelectObject, hDcPlayerPlane2Mask, hBmp
+	invoke DeleteObject, hBmp
+
+	invoke ReleaseDC, hMainWnd, hDC
+	ret
+InitDC ENDP
+; #########################################################################
+DeleteDC PROTO
+	; tobedone
+	ret
+DeleteDC ENDP
 ; #########################################################################
 
 END WinMain

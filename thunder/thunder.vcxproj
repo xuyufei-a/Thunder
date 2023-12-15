@@ -155,6 +155,7 @@
     </MASM>
   </ItemGroup>
   <ItemGroup>
+    <None Include="resource.inc" />
     <None Include="thunder.inc" />
   </ItemGroup>
   <ItemGroup>
@@ -165,6 +166,20 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="icon1.ico" />
+    <Image Include="image\boom01.bmp" />
+    <Image Include="image\boom01_mask.bmp" />
+    <Image Include="image\boom02.bmp" />
+    <Image Include="image\boom02_mask.bmp" />
+    <Image Include="image\boom03.bmp" />
+    <Image Include="image\boom03_mask.bmp" />
+    <Image Include="image\enemy1.bmp" />
+    <Image Include="image\enemy1_mask.bmp" />
+    <Image Include="image\enemy2.bmp" />
+    <Image Include="image\enemy2_mask.bmp" />
+    <Image Include="image\player1.bmp" />
+    <Image Include="image\player1_mask.bmp" />
+    <Image Include="image\player2.bmp" />
+    <Image Include="image\player2_mask.bmp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
