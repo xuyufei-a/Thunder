@@ -151,7 +151,7 @@ GameProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
 		.elseif wParam == KEY_RIGHTARROW
 			mov rightKeyHold, True	
 		.elseif wParam == KEY_SPACEBAR
-			mov spaceKeyHold, True
+			mov spacebarKeyHold, True
 		.elseif wParam == KEY_ENTER
 			mov enterKeyHold, True
 		.elseif wParam == KEY_ESC
@@ -167,7 +167,7 @@ GameProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
 		.elseif wParam == KEY_RIGHTARROW
 			mov rightKeyHold, False
 		.elseif wParam == KEY_SPACEBAR
-			mov spaceKeyHold, False
+			mov spacebarKeyHold, False
 		.elseif wParam == KEY_ENTER
 			mov enterKeyHold, False
 		.endif
@@ -197,13 +197,13 @@ InitGame PROC playerCount: DWORD
 	; init player 1	
 	mov p1Plane.plane.rect.x, P1_BIRTH_POINT_X
 	mov p1Plane.plane.rect.y, P1_BIRTH_POINT_Y
-	mov p1Plane.plane.rect.width, PLAYER_PLANE_WIDTH
-	mov p1Plane.plane.rect.height, PLAYER_PLANE_HEIGHT
+	mov p1Plane.plane.rect.lx, PLAYER_PLANE_WIDTH
+	mov p1Plane.plane.rect.ly, PLAYER_PLANE_HEIGHT
 	
 	m2m p1Plane.plane.hDcBmp, hDcPlayerPlane1
 	m2m p1Plane.plane.hDcBmpMask, hDcPlayerPlane1Mask
-	mov p1Plane.plane.width, BMP_SIZE_PLAYER_WIDTH
-	mov p1Plane.plane.height, BMP_SIZE_PLAYER_HEIGHT
+	mov p1Plane.plane.lx, BMP_SIZE_PLAYER_WIDTH
+	mov p1Plane.plane.ly, BMP_SIZE_PLAYER_HEIGHT
 	mov p1Plane.plane.nextEmitCountdown, PLAYER_EMIT_INTERVAL
 
 	mov p1Plane.health, MAX_HEALTH
@@ -211,13 +211,13 @@ InitGame PROC playerCount: DWORD
 	; init player2
 	mov p2Plane.plane.rect.x, P2_BIRTH_POINT_X
 	mov p2Plane.plane.rect.y, P2_BIRTH_POINT_Y
-	mov p2Plane.plane.rect.width, PLAYER_PLANE_WIDTH
-	mov p2Plane.plane.rect.height, PLAYER_PLANE_HEIGHT
+	mov p2Plane.plane.rect.lx, PLAYER_PLANE_WIDTH
+	mov p2Plane.plane.rect.ly, PLAYER_PLANE_HEIGHT
 	
 	m2m p2Plane.plane.hDcBmp, hDcPlayerPlane2
 	m2m p2Plane.plane.hDcBmpMask, hDcPlayerPlane2Mask
-	mov p2Plane.plane.width, BMP_SIZE_PLAYER_WIDTH
-	mov p2Plane.plane.height, BMP_SIZE_PLAYER_HEIGHT
+	mov p2Plane.plane.lx, BMP_SIZE_PLAYER_WIDTH
+	mov p2Plane.plane.ly, BMP_SIZE_PLAYER_HEIGHT
 	mov p2Plane.plane.nextEmitCountdown, PLAYER_EMIT_INTERVAL
 
 	.if playerCount > 1
@@ -231,7 +231,7 @@ InitGame ENDP
 EmitBullet PROC
 	local planeCount : DWORD
 	local pPlane	 : DWORD
-	local pBullet	 : DWORD
+	local bullet	 : Bullet
 
 	; enemy planes emit bullets
 	m2m planeCount, planeQueueSize
@@ -240,123 +240,137 @@ EmitBullet PROC
 		mov pPlane, eax
 		invoke PopPlane
 
-		mov eax, [pPlane+PlayerPlane.Plane.nextEmitCountdown]
+		mov esi, pPlane
+		ASSUME esi: PTR Plane
+		mov eax, [esi].nextEmitCountdown
 		dec eax
 		.if eax == 0
-			; tobedone init bullet position
-			m2m [pBullet+Bullet.MyRect.x], [pPlane+Plane.MyRect.x]
-			m2m [pBullet+Bullet.MyRect.y], [pPlane+Plane.MyRect.y]
+			m2m bullet.rect.x, [esi].rect.x
+			m2m bullet.rect.y, [esi].rect.y
 
-			mov [pBullet+Bullet.MyRect.width], BULLET_WIDTH
-			mov [pBullet+Bullet.MyRect.height], BULLET_HEIGHT
-			mov [pBullet+Bullet.xSpeed], 0
-			mov [pBullet+Bullet.ySpeed], SPEED_ENEMY_BULLET
-			mov [pBullet+Bullet.color], BULLET_COLOR_ENEMY
-			invoke PushBullet, pBullet
+			mov bullet.rect.lx, BULLET_WIDTH
+			mov bullet.rect.ly, BULLET_HEIGHT
+			mov bullet.xSpeed, 0
+			mov bullet.ySpeed, SPEED_ENEMY_BULLET
+			mov bullet.color, BULLET_COLOR_ENEMY
+			invoke PushBullet, ADDR bullet
 
 			mov eax, ENEMY_EMIT_INTERVAL
 		.endif
-		mov [pPlane+PlayerPlane.Plane.nextEmitCountdown], eax]	
+		mov [esi].nextEmitCountdown, eax	
 	.endw
 
 	; player planes emit bullets
-	.if DWORD PTR [p1Plane+playerPlane.health] > 0
-		dec [p1Plane+PlayerPlane.Plane.nextEmitCountdown]
+	mov esi, offset p1Plane
+	ASSUME esi: PTR PlayerPlane
+	mov eax, [esi].plane.nextEmitCountdown
+	.if [esi].health > 0
+		dec eax
 		.if spacebarKeyHold == True
-		.if DWORD PTR [p1Plane+PlayerPlane.Plane.nextEmitCountdown] <= 0
+		.if eax <= 0
 			; tobedone init bullet position
-			m2m [pBullet+Bullet.MyRect.x], [p1Plane+PlayerPlane.MyRect.x]
-			m2m [pBullet+Bullet.MyRect.y], [p1Plane+PlayerPlane.MyRect.y]
+			m2m bullet.rect.x, [esi].plane.rect.x
+			m2m bullet.rect.y, [esi].plane.rect.y
 
-			mov [pBullet+Bullet.MyRect.width], BULLET_WIDTH
-			mov [pBullet+Bullet.MyRect.height], BULLET_HEIGHT
-			mov [pBullet+Bullet.xSpeed], 0
-			mov [pBullet+Bullet.ySpeed], -SPEED_PLAYER_BULLET
-			mov [pBullet+Bullet.color], BULLET_COLOR_PLAYER
-			invoke PushBullet, pBullet
+			mov bullet.rect.lx, BULLET_WIDTH
+			mov bullet.rect.ly, BULLET_HEIGHT
+			mov bullet.xSpeed, 0
+			mov bullet.ySpeed, -SPEED_PLAYER_BULLET
+			mov bullet.color, BULLET_COLOR_PLAYER
+			invoke PushBullet, ADDR bullet
 			
-			mov DWORD PTR [p1Plane+PlayerPlane.Plane.nextEmitCountdown], PLAYER_EMIT_INTERVAL]
+			mov eax, PLAYER_EMIT_INTERVAL
 		.endif
 		.endif
+		mov [esi].plane.nextEmitCountdown, eax
 	.endif
-	
-	.if DWORD PTR [p2Plane+playerPlane.health] > 0
-		dec [p2Plane+PlayerPlane.Plane.nextEmitCountdown]
-		.if enterKeyHold == True
-		.if DWORD PTR [p2Plane+PlayerPlane.Plane.nextEmitCountdown] <= 0
-			; tobedone init bullet position
-			m2m [pBullet+Bullet.MyRect.x], [p2Plane+PlayerPlane.MyRect.x]
-			m2m [pBullet+Bullet.MyRect.y], [p2Plane+PlayerPlane.MyRect.y]
 
-			mov [pBullet+Bullet.MyRect.width], BULLET_WIDTH
-			mov [pBullet+Bullet.MyRect.height], BULLET_HEIGHT
-			mov [pBullet+Bullet.xSpeed], 0
-			mov [pBullet+Bullet.ySpeed], -SPEED_PLAYER_BULLET
-			mov [pBullet+Bullet.color], BULLET_COLOR_PLAYER
-			invoke PushBullet, pBullet
+	mov esi, offset p2Plane
+	ASSUME esi: PTR PlayerPlane
+	mov eax, [esi].plane.nextEmitCountdown
+	.if [esi].health > 0
+		dec eax
+		.if spacebarKeyHold == True
+		.if eax <= 0
+			; tobedone init bullet position
+			m2m bullet.rect.x, [esi].plane.rect.x
+			m2m bullet.rect.y, [esi].plane.rect.y
+
+			mov bullet.rect.lx, BULLET_WIDTH
+			mov bullet.rect.ly, BULLET_HEIGHT
+			mov bullet.xSpeed, 0
+			mov bullet.ySpeed, -SPEED_PLAYER_BULLET
+			mov bullet.color, BULLET_COLOR_PLAYER
+			invoke PushBullet, ADDR bullet
 			
-			mov DWORD PTR [p2Plane+PlayerPlane.Plane.nextEmitCountdown], PLAYER_EMIT_INTERVAL]
+			mov eax, PLAYER_EMIT_INTERVAL
 		.endif
 		.endif
+		mov [esi].plane.nextEmitCountdown, eax
 	.endif
 	ret
 EmitBullet ENDP
 ; ########################################################################
 CheckIntersection PROC pRect1: DWORD, pRect2: DWORD
-	local l1	: SWORD
-	local r1	: SWORD
-	local t1	: SWORD
-	local b1	: SWORD
-	local l2	: SWORD
-	local r2	: SWORD
-	local t2	: SWORD
-	local b2	: SWORD
+	local l1	: SDWORD
+	local r1	: SDWORD
+	local t1	: SDWORD
+	local b1	: SDWORD
+	local l2	: SDWORD
+	local r2	: SDWORD
+	local t2	: SDWORD
+	local b2	: SDWORD
 
 	mov eax, True
 
-	mov si, SWORD PTR [pRect1+MyRect.x]
-	mov di, SWORD PTR [pRect1+MyRect.y]
-	mov l1, si
-	mov t1, di
-	add si, SWORD PTR [pRect1+MyRect.width]
-	add di, SWORD PTR [pRect1+MyRect.height]
-	mov r1, si
-	mov b1, di
+	mov esi, pRect1
+	ASSUME esi: PTR MyRect
+	mov ecx, [esi].x
+	mov ebx, [esi].y
+	mov l1, ecx
+	mov t1, ebx
+	add ecx, [esi].lx
+	mov r1, ecx
+	add ebx, [esi].ly
+	mov b1, ebx
+	
+	mov esi, pRect2
+	ASSUME esi: PTR MyRect
+	mov ecx, [esi].x
+	mov ebx, [esi].y
+	mov l2, ecx
+	mov t2, ebx
+	add ecx, [esi].lx
+	mov r2, ecx
+	add ebx, [esi].ly
+	mov b2, ebx
 
-	mov si, SWORD PTR [pRect2+MyRect.x]
-	mov di, SWORD PTR [pRect2+MyRect.y]
-	mov l2, si
-	mov t2, di
-	add si, SWORD PTR [pRect2+MyRect.width]
-	add di, SWORD PTR [pRect2+MyRect.height]
-	mov r2, si
-	mov b2, di
-
-	mov si, l1
-	mov di, r2
-	sub si, di
-	.if si > 0
+	; check if the two rectangles intersect
+	mov esi, l1
+	mov edi, r2
+	sub esi, edi
+	.if esi > 0
 		mov eax, False
 	.endif
 
-	mov si, l2
-	mov di, r1
-	sub si, di
-	.if si > 0
+	mov esi, l2
+	mov edi, r1
+	sub esi, edi
+	.if esi > 0
 		mov eax, False
 	.endif
 
-	mov si, t1
-	mov di, b2
-	sub si, di
-	.if si > 0
+	mov esi, t1
+	mov edi, b2
+	sub esi, edi
+	.if esi > 0
 		mov eax, False
 	.endif
 
-	mov si, t2
-	mov di, b1
-	sub si, di
-	.if si > 0
+	mov esi, t2
+	mov edi, b1
+	sub esi, edi
+	.if esi > 0
 		mov eax, False
 	.endif
 	ret
@@ -375,8 +389,6 @@ SolveCollision PROC
 
 	local bulletsCount	: DWORD
 	local planesCount	: DWORD
-	local pBullet		: DWORD
-	local pPlane		: DWORD
 	local bulletColor   : WORD
 	local flag 		    : WORD
 
@@ -385,78 +397,79 @@ SolveCollision PROC
 	.while bulletsCount > 0
 		; get the bullet at the queue front
 		invoke GetBulletFront
-		mov pBullet, eax
+		mov esi, eax
+		ASSUME esi: PTR Bullet
 		invoke PopBullet
-		m2m bulletColor, DWORD PTR [pBullet+Bullet.color]
+		m2m bulletColor, [esi].color
 		mov flag, False									; flag to indicate if the bullet is deleted
-		
 
 		; iterate the planes and check collision
 		.if bulletColor == BULLET_COLOR_PLAYER			; bullet belongs to player
-
 			m2m planesCount, planeQueueSize
 			.while planesCount > 0
 				invoke GetPlaneFront
-				mov pPlane, eax
+				mov edi, eax
+				ASSUME edi: PTR Plane
 				invoke PopPlane
 
-				invoke CheckIntersection, pBullet, pPlane
+				invoke CheckIntersection, esi, edi
 				.if eax == True
-					invoke PushExplosion, pPlane
+					invoke PushExplosion, edi
 					mov flag, True	
 					; tobedone add score
 				.endif
 
 				.if flag == False
-					invoke PushPlane, pPlane
+					invoke PushPlane, edi
 				.endif 
 
 				.break .if flag == True					; bullet can only hit one plane
 				dec planesCount
 			.endw
 		.elseif bulletColor == BULLET_COLOR_ENEMY
-			m2m pPlane, offset p1Plane
+			mov edi, offset p1Plane
+			ASSUME edi: PTR PlayerPlane
 			
 			.if flag == True
 			    jmp @F
 			.endif
-			mov eax, [pPlane+PlayerPlane.health]
-			.if eax == 0
+			.if [edi.health] == 0
 			    jmp @F
 			.endif
 
-			invoke CheckIntersection, pBullet, pPlane	
+			invoke CheckIntersection, esi, edi
 			.if eax == True
-				invoke PushExplosion, pPlane
+				invoke PushExplosion, edi
 				mov flag, True
-				dec [pPlane+PlayerPlane.health]
+				dec [edi].health
 				; tobedone relocate the rebirth point
-				mov [pPlane+PlayerPlane.Plane.MyRect.x], P1_BIRTH_POINT_X
+				mov [edi].plane.rect.x, P1_BIRTH_POINT_X]
 			.endif
 		@@:
-			m2m pPlane, offset p2Plane
-			
+			mov edi, offset p2Plane
+			ASSUME edi: PTR PlayerPlane
+
 			.if flag == True
 			    jmp @F
 			.endif
-			mov eax, [pPlane+PlayerPlane.health]
-			.if eax == 0
+			.if [edi.health] == 0
 			    jmp @F
 			.endif
 
-			invoke CheckIntersection, pBullet, pPlane	
+			invoke CheckIntersection, esi, edi
 			.if eax == True
-				invoke PushExplosion, pPlane
+				invoke PushExplosion, edi
 				mov flag, True
-				dec [pPlane+PlayerPlane.health]
-				mov [pPlane+PlayerPlane.Plane.MyRect.x], P2_BIRTH_POINT_X
+				dec [edi].health
+				; tobedone relocate the rebirth point
+				mov [edi].plane.rect.x, P1_BIRTH_POINT_X]
 			.endif
 		@@:
 		.endif
 
 		; if there is no collison, push the bullet back
 		.if flag == False
-			invoke PushBullet, pBullet
+			invoke PushBullet, esi
 		.endif 
 		dec bulletsCount
 	.endw
@@ -466,21 +479,27 @@ SolveCollision ENDP
 ; ########################################################################
 CheckIllegal PROC pRect: DWORD
 	mov eax, True
-	mov si, SWORD PTR [pRect+MyRect.x]
-	mov di, SWORD PTR [pRect+MyRect.y]
 	
-	.if si < 0
+	mov ebx, pRect
+	ASSUME ebx: PTR MyRect
+
+	mov esi, [ebx].x
+	mov edi, [ebx].y
+
+	.if esi > WINDOW_WIDTH
 		mov eax, False
-	.elseif di < 0
+	.endif
+	.if edi > WINDOW_HEIGHT
 		mov eax, False
 	.endif
 
-	add si, WORD PTR [pRect+MyRect.width]
-	add di, WORD PTR [pRect+MyRect.height]
+	add esi, [ebx].lx
+	add edi, [ebx].ly
 
-	.if si > WINDOW_WIDTH
+	.if esi < 0
 		mov eax, False
-	.elseif di > WINDOW_HEIGHT
+	.endif 
+	.if edi < 0
 		mov eax, False
 	.endif
 
@@ -490,8 +509,6 @@ CheckIllegal ENDP
 CalNextPos PROC
 	local bulletsCount	: DWORD	
 	local planesCount	: DWORD
-	local pBullet		: DWORD
-	local pPlane		: DWORD
 
 	m2m bulletsCount, bulletQueueSize
 	m2m planesCount, planeQueueSize
@@ -499,18 +516,19 @@ CalNextPos PROC
 	; loop iterate all the bullets in the circular queue
 	.while bulletsCount > 0
 		invoke GetBulletFront
-		mov pBullet, eax
+		mov esi, eax
+		ASSUME esi: PTR Bullet
 		invoke PopBullet
 	
-		mov eax, [pBullet+Bullet.rect.x]
-		add eax, [pBullet+Bullet.xSpeed]
-		mov [pBullet+Bullet.rect.x], eax
-		mov eax, [pBullet+Bullet.rect.y]
-		add eax, [pBullet+Bullet.ySpeed]
-		mov [pBullet+Bullet.rect.y], eax
-		invoke CheckIllegal, pBullet
+		mov eax, [esi].rect.x
+		add eax, [esi].xSpeed
+		mov [esi].rect.x, eax
+		mov eax, [esi].rect.y
+		add eax, [esi].ySpeed
+		mov [esi].rect.y, eax
+		invoke CheckIllegal, esi
 		.if eax == True
-			invoke PushBullet, pBullet
+			invoke PushBullet, esi
 		.endif
 
 		dec bulletsCount
@@ -519,60 +537,67 @@ CalNextPos PROC
 	; loop iterate all the planes in the circular queue
 	.while planesCount > 0
 		invoke GetPlaneFront
-		mov pPlane, eax
+		mov edi, eax
+		ASSUME edi: PTR Plane
 		invoke PopPlane
 
 	; modify following code becase the variable are now SDWORD
-		mov eax, [pPlane+Plane.rect.x]
-		add eax, [pPlane+Plane.xSpeed]
-		mov pPlane+Plane.rect.x], eax
-		mov eax, [pPlane+Plane.rect.y]
-		add eax, [pPlane+Plane.ySpeed]
-		mov [pPlane+Plane.rect.y], eax
-		invoke CheckIllegal, pPlane
+		mov eax, [edi].rect.x
+		add eax, [edi].xSpeed
+		mov [edi].rect.x, eax
+		mov eax, [edi].rect.y
+		add eax, [edi].ySpeed
+		mov [edi].rect.y, eax
+		invoke CheckIllegal, edi
 		.if eax == True
-			invoke PushPlane, pPlane
+			invoke PushPlane, edi
 		.endif
 
 		dec planesCount
 	.endw
 
-	; cal player plane's next position
+	; cal next position of the player plane
+
+	mov edi, offset p1Plane
+	ASSUME edi: PTR PlayerPlane
 	
 	.if aKeyHold == True
-		mov eax, [p1Plane+PlayerPlane.rect.x]
-		sub eax, [p1Plane+PlayerPlane.plane.xSpeed]
+		mov eax, [edi].plane.rect.x
+		sub eax, [edi].plane.xSpeed
 		.if eax < 0
 			mov eax, 0
 		.endif
-		mov [p1Plane+PlayerPlane.rect.x], eax
+		mov [edi].plane.rect.x, eax
 	.endif
 	
 	.if dKeyHold == True
-		mov eax, [p1Plane+PlayerPlane.rect.x]
-		add eax, [p1Plane+PlayerPlane.plane.xSpeed]
-		.if eax + PLAYER_PLANE_WIDTH > WINDOW_WIDTH
+		mov eax, [edi].plane.rect.x
+		add eax, [edi].plane.xSpeed
+		.if eax > WINDOW_WIDTH - PLAYER_PLANE_WIDTH
 			mov eax, WINDOW_WIDTH - PLAYER_PLANE_WIDTH
 		.endif
-		mov [p1Plane+PlayerPlane.rect.x], eax
+		mov [edi].plane.rect.x, eax
 	.endif
-	; tobedone unknown bug for different size hint if I don't specify the size of the variable
+
+	mov edi, offset p2Plane
+	ASSUME edi: PTR PlayerPlane
+
 	.if leftKeyHold == True
-		mov eax, [p2Plane+PlayerPlane.rect.x]
-		sub eax, [p2Plane+PlayerPlane.plane.xSpeed]
+		mov eax, [edi].plane.rect.x
+		sub eax, [edi].plane.xSpeed
 		.if eax < 0
-			mov ax, 0
+			mov eax, 0
 		.endif
-		mov [p2Plane+PlayerPlane.rect.x], eax
+		mov [edi].plane.rect.x, eax
 	.endif
 
 	.if rightKeyHold == True
-		mov eax, [p2Plane+PlayerPlane.rect.x]
-		add eax, [p2Plane+PlayerPlane.plane.xSpeed]
-		.if eax + PLAYER_PLANE_WIDTH > WINDOW_WIDTH
-			mov ax, WINDOW_WIDTH - PLAYER_PLANE_WIDTH
+		mov eax, [edi].plane.rect.x
+		add eax, [edi].plane.xSpeed
+		.if eax > WINDOW_WIDTH - PLAYER_PLANE_WIDTH
+			mov eax, WINDOW_WIDTH - PLAYER_PLANE_WIDTH
 		.endif
-		mov [p2Plane+PlayerPlane.rect.x], eax
+		mov [edi].plane.rect.x, eax
 	.endif
 	ret
 CalNextPos ENDP
@@ -787,6 +812,7 @@ DrawPlane PROC
 	local planeCount : DWORD
 	local pPlane	 : DWORD
 
+	comment /*
 	; draw enemy plane
 	m2m planeCount, planeQueueSize
 	.while planeCount > 0
@@ -794,15 +820,15 @@ DrawPlane PROC
 		mov pPlane, eax
 		invoke PopPlane
 		
-		invoke StretchBlt, hMemDc, SDWORD PTR [pPlane+Plane.MyRect.x], SDWORD PTR [pPlane+Plane.MyRect.y],
-						SDWORD PTR [pPlane+Plane.MyRect.width], SDWORD PTR [pPlane+Plane.MyRect.height], 
+		invoke StretchBlt, hMemDc, SDWORD PTR [pPlane+Plane.rect.x], SDWORD PTR [pPlane+Plane.rect.y],
+						SDWORD PTR [pPlane+Plane.rect.lx], SDWORD PTR [pPlane+Plane.rect.ly], 
 						[pPlane+Plane.hDcBmpMask], 0, 0, 
-						SDWORD PTR [pPlane+Plane.width], SDWORD PTR [pPlane+Plane.height], SRCAND
+						SDWORD PTR [pPlane+Plane.lx], SDWORD PTR [pPlane+Plane.ly], SRCAND
 		
-		invoke StretchBlt, hMemDc, SDWORD PTR [pPlane+Plane.MyRect.x], SDWORD PTR [pPlane+Plane.MyRect.y],
-						SDWORD PTR [pPlane+Plane.MyRect.width], SDWORD PTR [pPlane+Plane.MyRect.height], 
+		invoke StretchBlt, hMemDc, SDWORD PTR [pPlane+Plane.rect.x], SDWORD PTR [pPlane+Plane.rect.y],
+						SDWORD PTR [pPlane+Plane.rect.lx], SDWORD PTR [pPlane+Plane.rect.ly], 
 						[pPlane+Plane.hDcBmp], 0, 0, 
-						SDWORD PTR [pPlane+Plane.width], SDWORD PTR [pPlane+Plane.height], SRCPAINT
+						SDWORD PTR [pPlane+Plane.lx], SDWORD PTR [pPlane+Plane.ly], SRCPAINT
 
 		invoke PushPlane, pPlane
 		dec planeCount
@@ -812,30 +838,31 @@ DrawPlane PROC
 	.if p1Plane.health > 0
 		mov pPlane, offset p1Plane
 
-		invoke StretchBlt, hMemDc, SDWORD PTR [pPlane+Plane.MyRect.x], SDWORD PTR [pPlane+Plane.MyRect.y],
-						SDWORD PTR [pPlane+Plane.MyRect.width], SDWORD PTR [pPlane+Plane.MyRect.height], 
+		invoke StretchBlt, hMemDc, SDWORD PTR [pPlane+Plane.rect.x], SDWORD PTR [pPlane+Plane.rect.y],
+						SDWORD PTR [pPlane+Plane.rect.lx], SDWORD PTR [pPlane+Plane.rect.ly], 
 						[pPlane+Plane.hDcBmpMask], 0, 0, 
-						SDWORD PTR [pPlane+Plane.width], SDWORD PTR [pPlane+Plane.height], SRCAND
+						SDWORD PTR [pPlane+Plane.lx], SDWORD PTR [pPlane+Plane.ly], SRCAND
 		
-		invoke StretchBlt, hMemDc, SDWORD PTR [pPlane+Plane.MyRect.x], SDWORD PTR [pPlane+Plane.MyRect.y],
-						SDWORD PTR [pPlane+Plane.MyRect.width], SDWORD PTR [pPlane+Plane.MyRect.height], 
+		invoke StretchBlt, hMemDc, SDWORD PTR [pPlane+Plane.rect.x], SDWORD PTR [pPlane+Plane.rect.y],
+						SDWORD PTR [pPlane+Plane.rect.lx], SDWORD PTR [pPlane+Plane.rect.ly], 
 						[pPlane+Plane.hDcBmp], 0, 0, 
-						SDWORD PTR [pPlane+Plane.width], SDWORD PTR [pPlane+Plane.height], SRCPAINT
+						SDWORD PTR [pPlane+Plane.lx], SDWORD PTR [pPlane+Plane.ly], SRCPAINT
 
 	.endif
 	.if p2Plane.health > 0
 		mov pPlane, offset p2Plane
 
-		invoke StretchBlt, hMemDc, SDWORD PTR [pPlane+Plane.MyRect.x], SDWORD PTR [pPlane+Plane.MyRect.y],
-						SDWORD PTR [pPlane+Plane.MyRect.width], SDWORD PTR [pPlane+Plane.MyRect.height], 
+		invoke StretchBlt, hMemDc, SDWORD PTR [pPlane+Plane.rect.x], SDWORD PTR [pPlane+Plane.rect.y],
+						SDWORD PTR [pPlane+Plane.rect.lx], SDWORD PTR [pPlane+Plane.rect.ly], 
 						[pPlane+Plane.hDcBmpMask], 0, 0, 
-						SDWORD PTR [pPlane+Plane.width], SDWORD PTR [pPlane+Plane.height], SRCAND
+						SDWORD PTR [pPlane+Plane.lx], SDWORD PTR [pPlane+Plane.ly], SRCAND
 		
-		invoke StretchBlt, hMemDc, SDWORD PTR [pPlane+Plane.MyRect.x], SDWORD PTR [pPlane+Plane.MyRect.y],
-						SDWORD PTR [pPlane+Plane.MyRect.width], SDWORD PTR [pPlane+Plane.MyRect.height], 
+		invoke StretchBlt, hMemDc, SDWORD PTR [pPlane+Plane.rect.x], SDWORD PTR [pPlane+Plane.rect.y],
+						SDWORD PTR [pPlane+Plane.rect.lx], SDWORD PTR [pPlane+Plane.rect.ly], 
 						[pPlane+Plane.hDcBmp], 0, 0, 
-						SDWORD PTR [pPlane+Plane.width], SDWORD PTR [pPlane+Plane.height], SRCPAINT
+						SDWORD PTR [pPlane+Plane.lx], SDWORD PTR [pPlane+Plane.ly], SRCPAINT
 	.endif
+	*/
 	ret
 DrawPlane ENDP
 ; #########################################################################
@@ -849,6 +876,7 @@ DrawBullet PROC
 	local right				: SDWORD	
 	local bottom			: SDWORD
 
+	comment /*
 	invoke CreateSolidBrush, BULLET_COLOR_ENEMY
 	mov enemyBulletBrush, eax
 	invoke CreateSolidBrush, BULLET_COLOR_PLAYER
@@ -866,12 +894,12 @@ DrawBullet PROC
 			invoke SelectObject, hMemDc, playerBulletBrush
 		.endif
 		
-		movsx left, SWORD PTR [pBullet+Bullet.MyRect.x]
-		movsx top, SWORD PTR [pBullet+Bullet.MyRect.y]
-		movsx eax, SWORD PTR [pBullet+Bullet.MyRect.width]
+		movsx left, SWORD PTR [pBullet+Bullet.rect.x]
+		movsx top, SWORD PTR [pBullet+Bullet.rect.y]
+		movsx eax, SWORD PTR [pBullet+Bullet.rect.lx]
 		add eax, left
 		mov right, eax
-		movsx eax, SWORD PTR [pBullet+Bullet.MyRect.height]
+		movsx eax, SWORD PTR [pBullet+Bullet.rect.ly]
 		add eax, top
 		mov bottom, eax
 
@@ -883,6 +911,7 @@ DrawBullet PROC
 
 	invoke DeleteObject, enemyBulletBrush
 	invoke DeleteObject, playerBulletBrush
+	*/
 	ret
 DrawBullet ENDP
 ; #########################################################################
@@ -890,6 +919,7 @@ DrawExplosion PROC
 	local explosionCount	: DWORD
 	local pExplosion		: DWORD
 
+	comment /*
 	m2m explosionCount, explosionQueueSize
 	.while explosionCount > 0
 		dec explosionCount
@@ -902,20 +932,21 @@ DrawExplosion PROC
 		
 		invoke StretchBlt, hMemDc, 
 						[pExplosion+Explosion.MyRect.x], [pExplosion+Explosion.MyRect.y], 
-						[pExplosion+Explosion.MyRect.width], [pExplosion+Explosion.MyRect.height], 
+						[pExplosion+Explosion.MyRect.lx], [pExplosion+Explosion.MyRect.ly], 
 						[pExplosion+Explosion.hDcBmpMask],
 						0, 0,
 						BMP_SIZE_BOOM_SIZE, BMP_SIZE_BOOM_SIZE, SRCAND
 
 		invoke StretchBlt, hMemDc, 
 						[pExplosion+Explosion.MyRect.x], [pExplosion+Explosion.MyRect.y], 
-						[pExplosion+Explosion.MyRect.width], [pExplosion+Explosion.MyRect.height], 
+						[pExplosion+Explosion.MyRect.lx], [pExplosion+Explosion.MyRect.ly], 
 						[pExplosion+Explosion.hDcBmpMask],
 						0, 0,
 						BMP_SIZE_BOOM_SIZE, BMP_SIZE_BOOM_SIZE, SRCPAINT
 
 		invoke PushExplosion, pExplosion
 	.endw
+	*/
 	ret
 DrawExplosion ENDP
 ; #########################################################################
@@ -930,11 +961,12 @@ DrawBackground PROC
 	mov brush, eax
 	invoke GetClientRect, hMainWnd, ADDR wndRect
 	
-	invoke FillRect	hDc, ADDR wndRect, brush
+	; tobedone bug
+	; invoke FillRect	hDc, ADDR wndRect, brush
 	
 	; tobedone may be a picture background
 	
-	invoke RealeaseDC, hMainWnd, hDc
+	invoke ReleaseDC, hMainWnd, hDc
 	ret
 DrawBackground ENDP
 ; #########################################################################

@@ -103,8 +103,8 @@ QUEUE_SIZE			EQU		1024
 
 
 ; bullet color, notify which camp it belongs
-BULLET_COLOR_PLAYER	EQU		0x000000FF		 
-BULLET_COLOR_ENEMY	EQU		0x00FF0000 
+BULLET_COLOR_PLAYER	EQU		000000FFH		 
+BULLET_COLOR_ENEMY	EQU		00FF0000H
 
 
 
@@ -148,16 +148,16 @@ MyRect STRUCT
 	x		SDWORD ?
 	y		SDWORD ?
 ; size
-	widt	SDWORD ?
-	height	SDWORD ?
+	lx		SDWORD ?
+	ly		SDWORD ?
 MyRect ENDS
 
 Bullet STRUCT
 ; position
 	rect		MyRect <>
 ; speed
-	xSpeed		SWORD ?
-	ySpeed		SWORD ?
+	xSpeed		SDWORD ?
+	ySpeed		SDWORD ?
 ; color, up to which camp it belongs
 	color		DWORD ?
 Bullet ENDS
@@ -171,8 +171,8 @@ Plane STRUCT
 ; bmpimage
 	hDcBmp		DWORD ?
 	hDcBmpMask	DWORD ?
-	widt		SDWORD ?
-	height		SDWORD ?
+	lx			SDWORD ?
+	ly			SDWORD ?
 ; the countdown for next emit bullet
 	nextEmitCountdown	SDWORD ?
 Plane ENDS
@@ -199,7 +199,7 @@ szDisplayName	DB "Thunder"
 hInstance		DWORD ?	; 创建当前进程的文件的句柄
 hMainWnd		DWORD ? ; 窗口的句柄
 
-gameStatus		DWORD GSTAUTS_MEMU ; 当前游戏所处的状态
+gameStatus		DWORD GSTATUS_MENU ; 当前游戏所处的状态
 
 ps				PAINTSTRUCT <>	; tobedone
 
