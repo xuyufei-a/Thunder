@@ -188,7 +188,7 @@ GameProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
 		invoke SolveCollision
 		invoke CalNextPos
 		invoke EmitBullet
-		invoke GenerateEnemy
+		;invoke GenerateEnemy
 		invoke RedrawWindow, hMainWnd, NULL, NULL, 1
 	.endif
 				
@@ -214,7 +214,8 @@ InitGame PROC playerCount: DWORD
 	mov plane.rect.lx, 100
 	mov plane.rect.ly, 100
 	mov plane.xSpeed, 0
-	mov plane.ySpeed, 0
+	mov plane.ySpeed, 1
+	mov plane.nextEmitCountdown, 10
 	m2m plane.hDcBmp, hDcPlayerPlane1
 	m2m plane.hDcBmpMask, hDcPlayerPlane1Mask
 	mov plane.lx, BMP_SIZE_PLAYER_WIDTH
@@ -268,7 +269,7 @@ InitGame ENDP
 EmitBullet PROC
 	local planeCount : DWORD
 	local bullet	 : Bullet
-
+	
 	; enemy planes emit bullets
 	m2m planeCount, planeQueueSize
 	.while planeCount > 0
@@ -618,7 +619,7 @@ CheckIllegal PROC pRect: DWORD
 	.if tmpVal > REAL_WIDTH
 		mov eax, False
 	.endif
-	mov tmpVal, esi
+	mov tmpVal, edi
 	.if tmpVal > REAL_HEIGHT
 		mov eax, False
 	.endif
@@ -878,9 +879,16 @@ PushExplosion PROC pRect:DWORD
 	mov ecx, sizeof Explosion
 	mul ecx
 	add eax, offset explosionQueue
+	ASSUME eax: PTR Explosion
 
-	; init duration for a new explosion
-	mov DWORD PTR [eax+Explosion.duration], EXPLOSION_DURATION
+	; init other members for a new explosion
+	mov [eax].duration, EXPLOSION_DURATION
+	m2m [eax].hDcBmp, hDcExplosion1
+	m2m [eax].hDcBmpMask, hDcExplosion1Mask
+	mov [eax].lx, BMP_SIZE_BOOM_SIZE
+	mov [eax].ly, BMP_SIZE_BOOM_SIZE
+	; tobedone more variety of explosin
+
 
 	; use rep movsb to copy the rect to the queue
 	mov ecx, sizeof MyRect
@@ -942,9 +950,9 @@ DrawGameScene PROC
 	local ps	:PAINTSTRUCT
 
 	invoke DrawBackground
+	invoke DrawExplosion
 	invoke DrawPlane
-	;invoke DrawBullet
-	;invoke DrawExplosion
+	invoke DrawBullet
 
 	; tobedone maybe add beginpaint and endpaint
 	invoke BeginPaint, hMainWnd, ADDR ps
