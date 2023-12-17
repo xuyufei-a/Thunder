@@ -3,6 +3,7 @@
 // π© thunder.rc  π”√
 //
 #define IDI_ICON1                       101
+#define IDB_BITMAP15                    102
 #define IDB_BITMAP1                     111
 #define IDB_BITMAP2                     112
 #define IDB_BITMAP3                     113
@@ -22,7 +23,7 @@
 // 
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
-#define _APS_NEXT_RESOURCE_VALUE        116
+#define _APS_NEXT_RESOURCE_VALUE        129
 #define _APS_NEXT_COMMAND_VALUE         40001
 #define _APS_NEXT_CONTROL_VALUE         1001
 #define _APS_NEXT_SYMED_VALUE           101

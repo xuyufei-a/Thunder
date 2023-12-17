@@ -10,6 +10,8 @@
 
 
 ;-------------function for GSTATUS_GAME status--------------
+; function to generate random number
+	Random PROTO :DWORD	; parameter is the limit of random number, return value is the random number
 ; function for painting
 	InitDC	PROTO
 	DestroyDC PROTO
@@ -27,6 +29,7 @@
 	CheckIntersection PROTO :DWORD, :DWORD	; check if the two rects intersect, parameters are the address of the two rects
 	SolveCollision PROTO					; remove bullets and planes that collide with others
 	CalNextPos	PROTO						; iterate enemy planes queue and bullet queue, cal their next position
+	GenerateEnemy PROTO						; generate enemy planes
 
 	; function used for iteract
 	EmitBullet PROTO						; the pamameter notify which player
@@ -57,7 +60,7 @@
 
 	m2m MACRO M1, M2
 		push M2
-		push M1
+		pop M1
 	ENDM
 
 	return MACRO arg
@@ -103,8 +106,8 @@ QUEUE_SIZE			EQU		1024
 
 
 ; bullet color, notify which camp it belongs
-BULLET_COLOR_PLAYER	EQU		000000FFH		 
-BULLET_COLOR_ENEMY	EQU		00FF0000H
+BULLET_COLOR_PLAYER	EQU		0000FF00H
+BULLET_COLOR_ENEMY	EQU		000000FFH
 
 
 
@@ -116,31 +119,45 @@ MAX_HEALTH				EQU		3
 ; time const
 PLAYER_EMIT_INTERVAL	EQU		10
 ENEMY_EMIT_INTERVAL		EQU		100
-EXPLOSION_DURATION		EQU		10
+EXPLOSION_DURATION		EQU		20
 
 
 ; size const
 PLAYER_PLANE_WIDTH		EQU		60
 PLAYER_PLANE_HEIGHT		EQU		50
 
+MAX_ENEMY_PLANE_WIDTH	EQU		80
+ENEMY_PLANE1_WIDTH		EQU		80
+ENEMY_PLANE1_HEIGHT		EQU		64
+ENEMY_PLANE2_WIDTH		EQU		60
+ENEMY_PLANE2_HEIGHT		EQU		90
 
 BULLET_WIDTH			EQU		5
 BULLET_HEIGHT			EQU		10
 
+EPSILON					EQU		7
 
 ; pos const 
 
+REAL_HEIGHT				EQU		441
+REAL_WIDTH				EQU		624
 P1_BIRTH_POINT_X		EQU		100
-P1_BIRTH_POINT_Y		EQU		WINDOW_HEIGHT - PLAYER_PLANE_HEIGHT
-P2_BIRTH_POINT_X		EQU     200
-P2_BIRTH_POINT_Y		EQU		WINDOW_HEIGHT - PLAYER_PLANE_HEIGHT
+P1_BIRTH_POINT_Y		EQU		REAL_HEIGHT - PLAYER_PLANE_HEIGHT
+P2_BIRTH_POINT_X		EQU     450
+P2_BIRTH_POINT_Y		EQU		REAL_HEIGHT - PLAYER_PLANE_HEIGHT
 
 ; speed const 
 SPEED_PLAYER_X			EQU		10
 SPEED_PLAYER_Y			EQU		0
-SPEED_PLAYER_BULLET		EQU		1
-SPEED_ENEMY_BULLET		EQU		1
+SPEED_ENEMY_X			EQU		0
+SPEED_ENEMY_Y			EQU		5
+SPEED_PLAYER_BULLET		EQU		10
+SPEED_ENEMY_BULLET		EQU		5
 
+
+; num const for generate random number
+RANDOM_A				EQU		1664525
+RANDOM_C				EQU		11
 
 ;=========local struct define========
 MyRect STRUCT 
@@ -188,6 +205,8 @@ Explosion STRUCT
 ; bmpimage
 	hDcBmp		DWORD ?
 	hDcBmpMask	DWORD ?
+	lx			SDWORD ?
+	ly			SDWORD ?
 ; remianing duration
 	duration	SDWORD ?
 Explosion ENDS
@@ -201,13 +220,13 @@ hMainWnd		DWORD ? ; 窗口的句柄
 
 gameStatus		DWORD GSTATUS_MENU ; 当前游戏所处的状态
 
-ps				PAINTSTRUCT <>	; tobedone
 
 ; game resource handles 
 hIcon				DWORD ?	; 当前窗口的图标
 hDc					DWORD ?	; 当前窗口的设备环境
 hBmp				DWORD ?
 hMemDc				DWORD ? ; 内存设备环境
+hDcBackground		DWORD ?
 hDcExplosion1		DWORD ?
 hDcExplosion1Mask	DWORD ?
 hDcPlayerPlane1		DWORD ?
@@ -216,17 +235,19 @@ hDcPlayerPlane2		DWORD ?
 hDcPlayerPlane2Mask	DWORD ?
 hDcEnemyPlane1		DWORD ?
 hDcEnemyPlane1Mask	DWORD ?
+hDcEnemyPlane2		DWORD ?
+hDcEnemyPlane2Mask	DWORD ?
 
 ; circular queue for bullets and planes
-bullets				Bullet QUEUE_SIZE dup(<>)
+bulletQueue			Bullet QUEUE_SIZE dup(<>)
 bulletQueueHead		DWORD ?
 bulletQueueTail		DWORD ?
 bulletQueueSize		DWORD ?
-planes				Plane QUEUE_SIZE dup(<>)   ; enemy planes
+planeQueue			Plane QUEUE_SIZE dup(<>)   ; enemy planes
 planeQueueHead		DWORD ?
 planeQueueTail		DWORD ?
 planeQueueSize		DWORD ?
-explosions			Explosion QUEUE_SIZE dup(<>)
+explosionQueue		Explosion QUEUE_SIZE dup(<>)
 explosionQueueHead	DWORD ?
 explosionQueueTail	DWORD ?
 explosionQueueSize	DWORD ?
@@ -236,9 +257,13 @@ p1Plane			PlayerPlane <>
 p2Plane			PlayerPlane <>
 
 ; variables for interaction
-aKeyHold			DWORD 0
-dKeyHold			DWORD 0
-spacebarKeyHold		DWORD 0
-leftKeyHold			DWORD 0
-rightKeyHold		DWORD 0
-enterKeyHold		DWORD 0
+aKeyHold			DWORD ?
+dKeyHold			DWORD ?
+spacebarKeyHold		DWORD ?
+leftKeyHold			DWORD ?
+rightKeyHold		DWORD ?
+enterKeyHold		DWORD ?
+
+
+; random number seed
+randomSeed			DWORD ?

@@ -1,4 +1,5 @@
 ; resource macro
+BMP_BACKGROUND		EQU 102
 
 BMP_BOOM1           EQU 111
 BMP_BOOM1_MASK      EQU 112

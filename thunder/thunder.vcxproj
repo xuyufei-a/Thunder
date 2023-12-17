@@ -166,6 +166,7 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="icon1.ico" />
+    <Image Include="image\background.bmp" />
     <Image Include="image\boom01.bmp" />
     <Image Include="image\boom01_mask.bmp" />
     <Image Include="image\boom02.bmp" />
