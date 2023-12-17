@@ -127,7 +127,7 @@ MenuProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
 
 		; tobedone  only game part finished, so start game when creating 
 		mov gameStatus, GSTATUS_GAME
-		invoke InitGame, 1
+		invoke InitGame, 2
 
 	.elseif uMsg == WM_KEYDOWN
 
@@ -188,7 +188,7 @@ GameProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
 		invoke SolveCollision
 		invoke CalNextPos
 		invoke EmitBullet
-		;invoke GenerateEnemy
+		invoke GenerateEnemy
 		invoke RedrawWindow, hMainWnd, NULL, NULL, 1
 	.endif
 				
@@ -205,24 +205,8 @@ SuspendProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
 SuspendProc ENDP
 ; ########################################################################
 InitGame PROC playerCount: DWORD
-	local plane :Plane 
 	; init queues
 	invoke InitQueue	
-
-	mov plane.rect.x, 100
-	mov plane.rect.y, 100
-	mov plane.rect.lx, 100
-	mov plane.rect.ly, 100
-	mov plane.xSpeed, 0
-	mov plane.ySpeed, 1
-	mov plane.nextEmitCountdown, 10
-	m2m plane.hDcBmp, hDcPlayerPlane1
-	m2m plane.hDcBmpMask, hDcPlayerPlane1Mask
-	mov plane.lx, BMP_SIZE_PLAYER_WIDTH
-	mov plane.ly, BMP_SIZE_PLAYER_HEIGHT
-	
-
-	invoke PushPlane, ADDR plane
 
 	; init random seed
 	invoke GetTickCount
@@ -243,6 +227,7 @@ InitGame PROC playerCount: DWORD
 	mov p1Plane.plane.nextEmitCountdown, PLAYER_EMIT_INTERVAL
 
 	mov p1Plane.health, MAX_HEALTH
+	mov p1Plane.rebirthDuration, 0
 	
 	; init player2
 	mov p2Plane.plane.rect.x, P2_BIRTH_POINT_X
@@ -257,6 +242,7 @@ InitGame PROC playerCount: DWORD
 	mov p2Plane.plane.lx, BMP_SIZE_PLAYER_WIDTH
 	mov p2Plane.plane.ly, BMP_SIZE_PLAYER_HEIGHT
 	mov p2Plane.plane.nextEmitCountdown, PLAYER_EMIT_INTERVAL
+	mov p2Plane.rebirthDuration, 0
 
 	.if playerCount > 1
 		mov p2Plane.health, MAX_HEALTH
@@ -284,6 +270,8 @@ EmitBullet PROC
 		.if eax == 0
 			m2m bullet.rect.x, [esi].rect.x
 			m2m bullet.rect.y, [esi].rect.y
+			mov eax, [esi].rect.ly
+			add bullet.rect.y, eax
 
 			mov bullet.rect.lx, BULLET_WIDTH
 			mov bullet.rect.ly, BULLET_HEIGHT
@@ -371,14 +359,21 @@ GenerateEnemy PROC
 	local planeCount : DWORD
 	local flag		 : DWORD
 
+	.if enemyCountdown != 0
+		dec enemyCountdown
+		ret
+	.endif
+
+	mov enemyCountdown, ENEMY_INTERVAL
 	invoke Random, REAL_WIDTH - MAX_ENEMY_PLANE_WIDTH
 	mov plane.rect.x, eax
 	mov plane.xSpeed, SPEED_ENEMY_X
 	mov plane.ySpeed, SPEED_ENEMY_Y
-	mov plane.nextEmitCountdown, ENEMY_EMIT_INTERVAL
+	invoke Random, ENEMY_EMIT_INTERVAL
+	mov plane.nextEmitCountdown, eax
 	
-	and eax, eax
-	.if eax == 1
+	and eax, 3
+	.if eax >= 2
 		mov plane.rect.y, -ENEMY_PLANE1_HEIGHT
 		mov plane.rect.lx, ENEMY_PLANE1_WIDTH
 		mov plane.rect.ly, ENEMY_PLANE1_HEIGHT
@@ -407,7 +402,7 @@ GenerateEnemy PROC
 		invoke PopPlane
 		
 		invoke CheckIntersection, esi, ADDR plane
-		.if eax == False
+		.if eax == True
 			mov flag, False
 		.endif
 		
@@ -516,6 +511,15 @@ SolveCollision PROC
 	local planesCount	: DWORD
 	local bulletColor   : WORD
 	local flag 		    : WORD
+	local explosion		: Explosion
+
+	; init other members for a new explosion
+	mov explosion.duration, EXPLOSION_DURATION
+	m2m explosion.hDcBmp, hDcExplosion1
+	m2m explosion.hDcBmpMask, hDcExplosion1Mask
+	mov explosion.lx, BMP_SIZE_BOOM_SIZE
+	mov explosion.ly, BMP_SIZE_BOOM_SIZE
+	; tobedone more variety of explosin
 
 	m2m bulletsCount, bulletQueueSize
 
@@ -532,6 +536,7 @@ SolveCollision PROC
 		.if bulletColor == BULLET_COLOR_PLAYER			; bullet belongs to player
 			m2m planesCount, planeQueueSize
 			.while planesCount > 0
+				dec planesCount
 				invoke GetPlaneFront
 				mov edi, eax
 				ASSUME edi: PTR Plane
@@ -539,17 +544,18 @@ SolveCollision PROC
 
 				invoke CheckIntersection, esi, edi
 				.if eax == True
-					invoke PushExplosion, edi
+					m2m explosion.rect.x, [edi].rect.x
+					m2m explosion.rect.y, [edi].rect.y
+					m2m explosion.rect.lx, [edi].rect.lx
+					m2m explosion.rect.ly, [edi].rect.ly
+					invoke PushExplosion, ADDR explosion
 					mov flag, True	
 					; tobedone add score
+				.elseif 
+					invoke PushPlane, edi
 				.endif
 
-				.if flag == False
-					invoke PushPlane, edi
-				.endif 
-
 				.break .if flag == True					; bullet can only hit one plane
-				dec planesCount
 			.endw
 		.elseif bulletColor == BULLET_COLOR_ENEMY
 			mov edi, offset p1Plane
@@ -561,14 +567,22 @@ SolveCollision PROC
 			.if [edi].health == 0
 			    jmp @F
 			.endif
+			.if [edi].rebirthDuration != 0
+				jmp @F
+			.endif
 
 			invoke CheckIntersection, esi, edi
 			.if eax == True
-				invoke PushExplosion, edi
+				m2m explosion.rect.x, [edi].plane.rect.x
+				m2m explosion.rect.y, [edi].plane.rect.y
+				m2m explosion.rect.lx, [edi].plane.rect.lx
+				m2m explosion.rect.ly, [edi].plane.rect.ly
+				invoke PushExplosion, ADDR explosion
 				mov flag, True
 				dec [edi].health
 				; tobedone relocate the rebirth point
 				mov [edi].plane.rect.x, P1_BIRTH_POINT_X
+				mov [edi].rebirthDuration, REBIRTH_INTERVAL
 			.endif
 		@@:
 			mov edi, offset p2Plane
@@ -580,14 +594,24 @@ SolveCollision PROC
 			.if [edi].health == 0
 			    jmp @F
 			.endif
+			.if [edi].rebirthDuration != 0
+				jmp @F
+			.endif
 
 			invoke CheckIntersection, esi, edi
 			.if eax == True
+				m2m explosion.rect.x, [edi].plane.rect.x
+				m2m explosion.rect.y, [edi].plane.rect.y
+				m2m explosion.rect.lx, [edi].plane.rect.lx
+				m2m explosion.rect.ly, [edi].plane.rect.ly
+				invoke PushExplosion, ADDR explosion
+				mov flag, True
 				invoke PushExplosion, edi
 				mov flag, True
 				dec [edi].health
 				; tobedone relocate the rebirth point
-				mov [edi].plane.rect.x, P1_BIRTH_POINT_X
+				mov [edi].plane.rect.x, P2_BIRTH_POINT_X
+				mov [edi].rebirthDuration, REBIRTH_INTERVAL
 			.endif
 		@@:
 		.endif
@@ -834,10 +858,10 @@ PushPlane PROC pPlane:DWORD
 	.if planeQueueTail == QUEUE_SIZE
 		mov planeQueueTail, 0
 	.endif
-	ret
 	pop edi
 	pop esi
 	pop ecx
+	ret
 PushPlane ENDP
 ; ########################################################################
 PopPlane PROC
@@ -866,7 +890,7 @@ GetPlaneFront PROC
 	ret
 GetPlaneFront ENDP
 ; ########################################################################
-PushExplosion PROC pRect:DWORD
+PushExplosion PROC pExplosion:DWORD
 	.if explosionQueueSize == QUEUE_SIZE
 		ret
 	.endif
@@ -881,18 +905,9 @@ PushExplosion PROC pRect:DWORD
 	add eax, offset explosionQueue
 	ASSUME eax: PTR Explosion
 
-	; init other members for a new explosion
-	mov [eax].duration, EXPLOSION_DURATION
-	m2m [eax].hDcBmp, hDcExplosion1
-	m2m [eax].hDcBmpMask, hDcExplosion1Mask
-	mov [eax].lx, BMP_SIZE_BOOM_SIZE
-	mov [eax].ly, BMP_SIZE_BOOM_SIZE
-	; tobedone more variety of explosin
-
 
 	; use rep movsb to copy the rect to the queue
-	mov ecx, sizeof MyRect
-	mov esi, pRect
+	mov esi, pExplosion
 	mov edi, eax
 	cld
 	rep movsb
@@ -903,9 +918,9 @@ PushExplosion PROC pRect:DWORD
 	.if explosionQueueTail == QUEUE_SIZE
 		mov explosionQueueTail, 0
 	.endif
-	push edi
-	push esi
-	push ecx
+	pop edi
+	pop esi
+	pop ecx
 	ret
 PushExplosion ENDP
 ; ########################################################################
@@ -994,32 +1009,44 @@ DrawPlane PROC
 	
 	; draw player plane
 	.if p1Plane.health > 0
-		mov esi , offset p1Plane
+		mov esi, offset p1Plane
 		ASSUME esi: PTR PlayerPlane
+		mov eax, [esi].rebirthDuration
+		.if eax > 0
+			dec [esi].rebirthDuration
+		.endif
+		and eax, 3
+		.if eax < 2
+			invoke StretchBlt, hMemDc,[esi].plane.rect.x, [esi].plane.rect.y,
+							[esi].plane.rect.lx, [esi].plane.rect.ly, 
+							[esi].plane.hDcBmpMask, 0, 0, 
+							[esi].plane.lx, [esi].plane.ly, SRCAND
 
-		invoke StretchBlt, hMemDc,[esi].plane.rect.x, [esi].plane.rect.y,
-						[esi].plane.rect.lx, [esi].plane.rect.ly, 
-						[esi].plane.hDcBmpMask, 0, 0, 
-						[esi].plane.lx, [esi].plane.ly, SRCAND
-
-		invoke StretchBlt, hMemDc,[esi].plane.rect.x, [esi].plane.rect.y,
-						[esi].plane.rect.lx, [esi].plane.rect.ly, 
-						[esi].plane.hDcBmp, 0, 0, 
-						[esi].plane.lx, [esi].plane.ly, SRCPAINT
+			invoke StretchBlt, hMemDc,[esi].plane.rect.x, [esi].plane.rect.y,
+							[esi].plane.rect.lx, [esi].plane.rect.ly, 
+							[esi].plane.hDcBmp, 0, 0, 
+							[esi].plane.lx, [esi].plane.ly, SRCPAINT
+		.endif
 	.endif
 	.if p2Plane.health > 0
-		mov esi , offset p2Plane
+		mov esi, offset p2Plane
 		ASSUME esi: PTR PlayerPlane
+		mov eax, [esi].rebirthDuration
+		.if eax > 0
+			dec [esi].rebirthDuration
+		.endif
+		and eax, 3
+		.if eax < 2
+			invoke StretchBlt, hMemDc,[esi].plane.rect.x, [esi].plane.rect.y,
+							[esi].plane.rect.lx, [esi].plane.rect.ly, 
+							[esi].plane.hDcBmpMask, 0, 0, 
+							[esi].plane.lx, [esi].plane.ly, SRCAND
 
-		invoke StretchBlt, hMemDc,[esi].plane.rect.x, [esi].plane.rect.y,
-						[esi].plane.rect.lx, [esi].plane.rect.ly, 
-						[esi].plane.hDcBmpMask, 0, 0, 
-						[esi].plane.lx, [esi].plane.ly, SRCAND
-
-		invoke StretchBlt, hMemDc,[esi].plane.rect.x, [esi].plane.rect.y,
-						[esi].plane.rect.lx, [esi].plane.rect.ly, 
-						[esi].plane.hDcBmp, 0, 0, 
-						[esi].plane.lx, [esi].plane.ly, SRCPAINT
+			invoke StretchBlt, hMemDc,[esi].plane.rect.x, [esi].plane.rect.y,
+							[esi].plane.rect.lx, [esi].plane.rect.ly, 
+							[esi].plane.hDcBmp, 0, 0, 
+							[esi].plane.lx, [esi].plane.ly, SRCPAINT
+		.endif
 	.endif
 	ret
 DrawPlane ENDP
@@ -1082,8 +1109,8 @@ DrawExplosion PROC
 		ASSUME esi: PTR Explosion
 		invoke PopExplosion
 
-		dec [esi].duration
-		.continue .if [esi].duration == 0	; it the explosion expires
+		.continue .if [esi].duration == 0	; if the explosion expires
+		dec [esi].duration	
 		
 		invoke StretchBlt, hMemDc, 
 						[esi].rect.x, [esi].rect.y,
