@@ -208,6 +208,9 @@ InitGame PROC playerCount: DWORD
 	; init queues
 	invoke InitQueue	
 
+	; init score
+	mov score, 0
+
 	; init random seed
 	invoke GetTickCount
 	mov randomSeed, eax
@@ -511,15 +514,6 @@ SolveCollision PROC
 	local planesCount	: DWORD
 	local bulletColor   : WORD
 	local flag 		    : WORD
-	local explosion		: Explosion
-
-	; init other members for a new explosion
-	mov explosion.duration, EXPLOSION_DURATION
-	m2m explosion.hDcBmp, hDcExplosion1
-	m2m explosion.hDcBmpMask, hDcExplosion1Mask
-	mov explosion.lx, BMP_SIZE_BOOM_SIZE
-	mov explosion.ly, BMP_SIZE_BOOM_SIZE
-	; tobedone more variety of explosin
 
 	m2m bulletsCount, bulletQueueSize
 
@@ -544,11 +538,8 @@ SolveCollision PROC
 
 				invoke CheckIntersection, esi, edi
 				.if eax == True
-					m2m explosion.rect.x, [edi].rect.x
-					m2m explosion.rect.y, [edi].rect.y
-					m2m explosion.rect.lx, [edi].rect.lx
-					m2m explosion.rect.ly, [edi].rect.ly
-					invoke PushExplosion, ADDR explosion
+					inc score
+					invoke AddNewExplosion, edi
 					mov flag, True	
 					; tobedone add score
 				.elseif 
@@ -573,11 +564,7 @@ SolveCollision PROC
 
 			invoke CheckIntersection, esi, edi
 			.if eax == True
-				m2m explosion.rect.x, [edi].plane.rect.x
-				m2m explosion.rect.y, [edi].plane.rect.y
-				m2m explosion.rect.lx, [edi].plane.rect.lx
-				m2m explosion.rect.ly, [edi].plane.rect.ly
-				invoke PushExplosion, ADDR explosion
+				invoke AddNewExplosion, edi
 				mov flag, True
 				dec [edi].health
 				; tobedone relocate the rebirth point
@@ -600,13 +587,7 @@ SolveCollision PROC
 
 			invoke CheckIntersection, esi, edi
 			.if eax == True
-				m2m explosion.rect.x, [edi].plane.rect.x
-				m2m explosion.rect.y, [edi].plane.rect.y
-				m2m explosion.rect.lx, [edi].plane.rect.lx
-				m2m explosion.rect.ly, [edi].plane.rect.ly
-				invoke PushExplosion, ADDR explosion
-				mov flag, True
-				invoke PushExplosion, edi
+				invoke AddNewExplosion, edi
 				mov flag, True
 				dec [edi].health
 				; tobedone relocate the rebirth point
@@ -615,7 +596,6 @@ SolveCollision PROC
 			.endif
 		@@:
 		.endif
-
 		; if there is no collison, push the bullet back
 		.if flag == False
 			invoke PushBullet, esi
@@ -623,6 +603,74 @@ SolveCollision PROC
 		dec bulletsCount
 	.endw
 
+	; solve the collision between enemy planes and player planes
+	mov edi, offset p1Plane
+	ASSUME esi: PTR PlayerPlane
+			
+	.if [edi].health == 0
+	    jmp @F
+	.endif
+	.if [edi].rebirthDuration != 0
+		jmp @F
+	.endif
+
+	mov flag, False
+	m2m planesCount, planeQueueSize
+	.while planesCount > 0
+		.break .if flag == True
+		dec planesCount
+		invoke GetPlaneFront
+		mov esi, eax
+		ASSUME esi: PTR Plane
+		invoke PopPlane
+		
+		invoke CheckIntersection, esi, edi
+		.if eax == True
+			invoke AddNewExplosion, edi
+			invoke AddNewExplosion, esi
+			mov flag, True
+			dec [edi].health
+			mov [edi].plane.rect.x, P1_BIRTH_POINT_X
+			mov [edi].rebirthDuration, REBIRTH_INTERVAL
+		.elseif 
+			invoke PushPlane, esi
+		.endif
+	.endw
+
+@@:
+	mov edi, offset p2Plane
+	ASSUME esi: PTR PlayerPlane
+			
+	.if [edi].health == 0
+	    jmp @F
+	.endif
+	.if [edi].rebirthDuration != 0
+		jmp @F
+	.endif
+
+	mov flag, False
+	m2m planesCount, planeQueueSize
+	.while planesCount > 0
+		.break .if flag == True
+		dec planesCount
+		invoke GetPlaneFront
+		mov esi, eax
+		ASSUME esi: PTR Plane
+		invoke PopPlane
+		
+		invoke CheckIntersection, esi, edi
+		.if eax == True
+			invoke AddNewExplosion, edi
+			invoke AddNewExplosion, esi
+			mov flag, True
+			dec [edi].health
+			mov [edi].plane.rect.x, P1_BIRTH_POINT_X
+			mov [edi].rebirthDuration, REBIRTH_INTERVAL
+		.elseif 
+			invoke PushPlane, esi
+		.endif
+	.endw
+@@:
 	ret
 SolveCollision ENDP
 ; ########################################################################
@@ -924,6 +972,44 @@ PushExplosion PROC pExplosion:DWORD
 	ret
 PushExplosion ENDP
 ; ########################################################################
+AddNewExplosion PROC pRect: DWORD
+	local explosion		: Explosion
+
+	push esi
+	push edi
+	push ecx
+	push eax
+
+	mov eax, edi
+	and eax, 7
+
+	; init other members for a new explosion
+	.if eax < 4
+		m2m explosion.hDcBmp, hDcExplosion1
+		m2m explosion.hDcBmpMask, hDcExplosion1Mask
+	.else
+		m2m explosion.hDcBmp, hDcExplosion2
+		m2m explosion.hDcBmpMask, hDcExplosion2Mask
+	.endif
+	mov explosion.duration, EXPLOSION_DURATION
+	mov explosion.lx, BMP_SIZE_BOOM_SIZE
+	mov explosion.ly, BMP_SIZE_BOOM_SIZE
+
+
+	mov ecx, sizeof MyRect
+	mov esi, pRect
+	lea edi, explosion
+	cld
+	rep movsb
+	invoke PushExplosion, ADDR explosion
+
+	pop eax
+	pop ecx
+	pop edi
+	pop esi
+	ret
+AddNewExplosion ENDP
+; ########################################################################
 PopExplosion PROC
 	.if explosionQueueSize == 0
 		ret
@@ -968,6 +1054,7 @@ DrawGameScene PROC
 	invoke DrawExplosion
 	invoke DrawPlane
 	invoke DrawBullet
+	invoke DrawGameInfo
 
 	; tobedone maybe add beginpaint and endpaint
 	invoke BeginPaint, hMainWnd, ADDR ps
@@ -1141,6 +1228,84 @@ DrawBackground PROC
 	ret
 DrawBackground ENDP
 ; #########################################################################
+DrawGameInfo PROC
+	local rect		:RECT
+
+	; draw score 
+	mov rect.left, (REAL_WIDTH - TEXT_WIDTH) / 2
+	mov rect.top, 0
+	mov rect.right, (REAL_WIDTH + TEXT_WIDTH) / 2
+	mov rect.bottom, TEXT_HEIGHT 
+
+	invoke wsprintfA, offset stringBuffer, offset formatNumber, score
+	invoke SetBkMode, hMemDc, TRANSPARENT
+	invoke DrawTextA, hMemDc, offset stringBuffer, -1, ADDR rect, DT_CENTER or DT_VCENTER or DT_SINGLELINE
+
+	; draw health
+	; player1
+	mov esi, 0
+	mov edi, p1Plane.health
+
+	.while edi > 0
+		dec edi 
+		invoke StretchBlt, hMemDc, 
+						esi, 0,
+						HEART_WIDTH, HEART_HEIGHT,
+						hDcHeartMask, 0, 0,
+						BMP_SIZE_HEART_WIDTH, BMP_SIZE_HEART_HEIGHT,
+						SRCAND
+		invoke StretchBlt, hMemDc, 
+						esi, 0,
+						HEART_WIDTH, HEART_HEIGHT,
+						hDcHeart, 0, 0,
+						BMP_SIZE_HEART_WIDTH, BMP_SIZE_HEART_HEIGHT,
+						SRCPAINT
+		
+		add esi, HEART_WIDTH
+	.endw
+
+	; player2
+	mov esi, REAL_WIDTH - HEART_WIDTH
+	mov edi, p2Plane.health
+
+	.while edi > 0
+		dec edi 
+		invoke StretchBlt, hMemDc, 
+						esi, 0,
+						HEART_WIDTH, HEART_HEIGHT,
+						hDcHeartMask, 0, 0,
+						BMP_SIZE_HEART_WIDTH, BMP_SIZE_HEART_HEIGHT,
+						SRCAND
+		invoke StretchBlt, hMemDc, 
+						esi, 0,
+						HEART_WIDTH, HEART_HEIGHT,
+						hDcHeart, 0, 0,
+						BMP_SIZE_HEART_WIDTH, BMP_SIZE_HEART_HEIGHT,
+						SRCPAINT
+		
+		sub esi, HEART_WIDTH
+	.endw
+
+	ret
+DrawGameInfo ENDP
+; #########################################################################
+ClearKeys PROC myMask :DWORD
+	test myMask, 1
+	JZ @F
+	mov aKeyHold, False
+	mov dKeyHold, False
+	mov spacebarKeyHold, False
+@@:
+
+	test myMask, 2
+	JZ @F
+	mov leftKeyHold, False
+	mov rightKeyHold, False
+	mov enterKeyHold, False
+@@:
+	ret
+ClearKeys ENDP
+; #########################################################################
 InitDC PROC 
 	; this function create memory DC and DCs for resources
     ; they should be delete when program exit
@@ -1156,8 +1321,19 @@ InitDC PROC
 	mov hBmp, eax
 	invoke SelectObject, hMemDc, hBmp
 	invoke DeleteObject, hBmp
+	
+	; select a pen
+	invoke GetStockObject, WHITE_PEN
+	invoke SelectObject, hMemDc, eax
 
 	; create resource DC
+	; create font 
+	invoke CreateFontA,30,0,0,0,700,0,0,0,GB2312_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,ANTIALIASED_QUALITY,FF_DECORATIVE,NULL
+	mov hFont30, eax
+	invoke SelectObject, hMemDc, hFont30
+
+	; set font color
+	invoke SetTextColor, hMemDc, COLOR_WHITE
 
 	; create a background DC
 	invoke CreateCompatibleDC, hDc
@@ -1181,6 +1357,35 @@ InitDC PROC
 	mov hBmp, eax
 	invoke SelectObject, hDcExplosion1Mask, hBmp
 	invoke DeleteObject, hBmp
+
+	invoke CreateCompatibleDC, hDc
+	mov hDcExplosion2, eax
+    invoke LoadBitmap, hInstance, BMP_BOOM2
+	mov hBmp, eax
+	invoke SelectObject, hDcExplosion2, hBmp
+	invoke DeleteObject, hBmp
+
+	invoke CreateCompatibleDC, hDc
+	mov hDcExplosion2Mask, eax
+	invoke LoadBitmap, hInstance, BMP_BOOM2_MASK
+	mov hBmp, eax
+	invoke SelectObject, hDcExplosion2Mask, hBmp
+	invoke DeleteObject, hBmp
+
+	invoke CreateCompatibleDC, hDc
+	mov hDcExplosion3, eax
+    invoke LoadBitmap, hInstance, BMP_BOOM3
+	mov hBmp, eax
+	invoke SelectObject, hDcExplosion3, hBmp
+	invoke DeleteObject, hBmp
+
+	invoke CreateCompatibleDC, hDc
+	mov hDcExplosion3Mask, eax
+	invoke LoadBitmap, hInstance, BMP_BOOM3_MASK
+	mov hBmp, eax
+	invoke SelectObject, hDcExplosion3Mask, hBmp
+	invoke DeleteObject, hBmp
+
 
 	; enemy plane and its mask
 	; enemy1
@@ -1242,6 +1447,21 @@ InitDC PROC
 	invoke LoadBitmap, hInstance, BMP_PLAYER2_MASK
 	mov hBmp, eax
 	invoke SelectObject, hDcPlayerPlane2Mask, hBmp
+	invoke DeleteObject, hBmp
+
+	; heart ans its mask
+	invoke CreateCompatibleDC, hDc
+	mov hDcHeart, eax
+	invoke LoadBitmap, hInstance, BMP_HEART
+	mov hBmp, eax
+	invoke SelectObject, hDcHeart, hBmp
+	invoke DeleteObject, hBmp
+
+	invoke CreateCompatibleDC, hDc
+	mov hDcHeartMask, eax
+	invoke LoadBitmap, hInstance, BMP_HEART_MASK
+	mov hBmp, eax
+	invoke SelectObject, hDcHeartMask, hBmp
 	invoke DeleteObject, hBmp
 
 	invoke ReleaseDC, hMainWnd, hDc

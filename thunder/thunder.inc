@@ -15,23 +15,29 @@
 ; function for painting
 	InitDC	PROTO
 	DestroyDC PROTO
+
+	DrawBackground PROTO
 	DrawPlane PROTO
 	DrawBullet PROTO
 	DrawExplosion	PROTO
-	DrawBackground PROTO
+	DrawGameInfo PROTO
 	DrawGameScene PROTO
 
 ; function for logic, such as collision dectection, calculating next position
 	; function for initailize
 	InitGame	PROTO	:DWORD				; pamameter is the number of players(1 or 2)
+
 	; function used when timer expires
+	; tool function
 	CheckIlligal PROTO :DWORD				; check if the rect is in the window, parameter is the address of the rect
 	CheckIntersection PROTO :DWORD, :DWORD	; check if the two rects intersect, parameters are the address of the two rects
+	AddNewExplosion PROTO :DWORD            ; parameter is the address of the rect, this function complete the initialization of the explosion and push it into the queue
+	ClearKeys		PROTO :DWORD		
+
+	; main function
 	SolveCollision PROTO					; remove bullets and planes that collide with others
 	CalNextPos	PROTO						; iterate enemy planes queue and bullet queue, cal their next position
 	GenerateEnemy PROTO						; generate enemy planes
-
-	; function used for iteract
 	EmitBullet PROTO						; the pamameter notify which player
 	
 	
@@ -103,7 +109,8 @@ KEY_ENTER			EQU		13
 
 ; size of circular queue
 QUEUE_SIZE			EQU		1024
-
+; size of buffer	
+BUFFER_SIZE			EQU		1024
 
 ; bullet color, notify which camp it belongs
 BULLET_COLOR_PLAYER	EQU		0000FF00H
@@ -137,7 +144,13 @@ ENEMY_PLANE2_HEIGHT		EQU		90
 BULLET_WIDTH			EQU		5
 BULLET_HEIGHT			EQU		10
 
+HEART_WIDTH				EQU		30
+HEART_HEIGHT			EQU		30
+
 EPSILON					EQU		7
+
+TEXT_WIDTH				EQU		200
+TEXT_HEIGHT				EQU		40
 
 ; pos const 
 
@@ -217,6 +230,8 @@ Explosion ENDS
 ; ===================data========================
 .data 
 szDisplayName	DB "Thunder"
+stringBuffer	DB BUFFER_SIZE dup(?)
+formatNumber	DB "%d", 0
 
 hInstance		DWORD ?	; 创建当前进程的文件的句柄
 hMainWnd		DWORD ? ; 窗口的句柄
@@ -232,6 +247,10 @@ hMemDc				DWORD ? ; 内存设备环境
 hDcBackground		DWORD ?
 hDcExplosion1		DWORD ?
 hDcExplosion1Mask	DWORD ?
+hDcExplosion2		DWORD ?
+hDcExplosion2Mask	DWORD ?
+hDcExplosion3		DWORD ?
+hDcExplosion3Mask	DWORD ?
 hDcPlayerPlane1		DWORD ?
 hDcPlayerPlane1Mask	DWORD ?
 hDcPlayerPlane2		DWORD ?
@@ -240,6 +259,9 @@ hDcEnemyPlane1		DWORD ?
 hDcEnemyPlane1Mask	DWORD ?
 hDcEnemyPlane2		DWORD ?
 hDcEnemyPlane2Mask	DWORD ?
+hDcHeart			DWORD ?
+hDcHeartMask		DWORD ?
+hFont30				DWORD ?
 
 ; circular queue for bullets and planes
 bulletQueue			Bullet QUEUE_SIZE dup(<>)
@@ -274,3 +296,4 @@ randomSeed			DWORD ?
 
 ; game info
 enemyCountdown		DWORD ?
+score				DWORD ?	

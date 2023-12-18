@@ -177,6 +177,8 @@
     <Image Include="image\enemy1_mask.bmp" />
     <Image Include="image\enemy2.bmp" />
     <Image Include="image\enemy2_mask.bmp" />
+    <Image Include="image\heart.bmp" />
+    <Image Include="image\heart_mask.bmp" />
     <Image Include="image\player1.bmp" />
     <Image Include="image\player1_mask.bmp" />
     <Image Include="image\player2.bmp" />
