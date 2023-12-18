@@ -185,6 +185,10 @@
     <Image Include="image\player2.bmp" />
     <Image Include="image\player2_mask.bmp" />
   </ItemGroup>
+  <ItemGroup>
+    <Media Include="audio\emit_bullet.wav" />
+    <Media Include="audio\explosion.wav" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
     <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />

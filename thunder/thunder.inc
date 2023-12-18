@@ -1,3 +1,6 @@
+	strlen PROTO C :DWORD
+
+
 ;=========local prototypes========
 	WinMain PROTO
 	WndProc PROTO :DWORD, :DWORD, :DWORD, :DWORD
@@ -13,6 +16,9 @@
 ;-------------function for GSTATUS_GAME status--------------
 ; function to generate random number
 	Random PROTO :DWORD	; parameter is the limit of random number, return value is the random number
+; function for sound
+	EmitSound PROTO 	; parameter is the sound resource id
+	ExplosionSound PROTO
 ; function for painting
 	InitDC	PROTO
 	DestroyDC PROTO
@@ -131,7 +137,7 @@ BULLET_COLOR_ENEMY	EQU		000000FFH
 ; some const for game logic
 
 ; num const
-MAX_HEALTH				EQU		1
+MAX_HEALTH				EQU		3
 
 ; time const
 PLAYER_EMIT_INTERVAL	EQU		10
@@ -312,11 +318,13 @@ score				DWORD ?
 szDisplayName	DB "Thunder"
 stringBuffer	DB BUFFER_SIZE dup(?)
 formatNumber	DB "%d", 0
-formatGameover  DB "Game over, your score is %d", 0ah, "Press q to quit", 0
+formatGameover  DB "Game over, your score is %d.", 0
+hintText		DB "Press q to quit.", 0
+HINT_TEXT_LEN	EQU $ - hintText
 pauseText		DB "Pause, press q to quit, press c to continue", 0
 PAUSE_TEXT_LEN	EQU $ - pauseText
 
-menuText		DB "Start Game", 0
+menuText		DB "Start Game", 0, "nihao"
 MENU_TEXT_LEN	EQU $ - menuText
 p1Text			DB "1 player ", 0
 P1_TEXT_LEN		EQU $ - p1Text

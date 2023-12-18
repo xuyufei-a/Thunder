@@ -15,8 +15,8 @@ include msvcrt.inc
 includelib msvcrt.lib
 include shell32.inc
 includelib shell32.lib
-include	 winmm.inc
-includelib  winmm.lib
+include	winmm.inc
+includelib winmm.lib
 
 include thunder.inc
 include resource.inc
@@ -131,12 +131,7 @@ MenuProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
 		invoke InitDC
 		m2m hMainWnd, [uMsg-4]
 		invoke SetTimer, hMainWnd, 1, GAME_REFRESH_INTERVAL, NULL
-
-		invoke InitGame, 1
 	.elseif uMsg == WM_KEYDOWN
-		invoke InitGame, 1
-		ret
-
 		mov up, False
 		mov down, False
 		mov confirm, False
@@ -394,6 +389,7 @@ EmitBullet PROC
 			sub eax, EPSILON
 			add bullet.rect.x, eax
 			invoke PushBullet, ADDR bullet
+			invoke CreateThread, NULL, NULL, ADDR EmitSound, NULL, 0, NULL
 			
 			mov eax, PLAYER_EMIT_INTERVAL
 		.endif
@@ -425,6 +421,7 @@ EmitBullet PROC
 			sub eax, EPSILON
 			add bullet.rect.x, eax
 			invoke PushBullet, ADDR bullet
+			invoke CreateThread, NULL, NULL, ADDR EmitSound, NULL, 0, NULL
 			
 			mov eax, PLAYER_EMIT_INTERVAL
 		.endif
@@ -1051,6 +1048,9 @@ PushExplosion ENDP
 ; ########################################################################
 AddNewExplosion PROC pRect: DWORD
 	local explosion		: Explosion
+	
+	; play sound
+	invoke CreateThread, NULL, NULL, ADDR ExplosionSound, NULL, 0, NULL
 
 	push esi
 	push edi
@@ -1128,7 +1128,6 @@ DrawMenuScene PROC
 	local ps	:PAINTSTRUCT
 	local rect	:RECT
 
-
 	invoke BitBlt, hMemDc, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, hDcBlack, 0, 0, SRCCOPY
 
 	invoke SelectObject, hMemDc, hFont50
@@ -1158,11 +1157,12 @@ DrawMenuScene PROC
 	.endif
 	invoke SetBkColor, hMemDc, COLOR_BLACK
 	invoke SetTextColor, hMemDc, COLOR_WHITE
-	
+
 	invoke BeginPaint, hMainWnd, ADDR ps
+	mov hDc, eax
 	invoke BitBlt, hDc, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, hMemDc, 0, 0, SRCCOPY
-	invoke EndPaint, hMainWnd, ADDR ps
-	mov eax, hDc
+	invoke EndPaint, hMainWnd, ADDR ps	
+
 	ret
 DrawMenuScene ENDP
 ; #########################################################################
@@ -1175,17 +1175,16 @@ DrawGameoverScene PROC
 	invoke wsprintfA, offset stringBuffer, offset formatGameover, score
 	invoke SelectObject, hMemDc, hFont30
 	invoke SetBkMode, hMemDc, TRANSPARENT
-	invoke SetTextAlign, hMemDc, TA_CENTER
-	mov rect.left, 0
-	mov rect.right, WINDOW_WIDTH
-	mov rect.top, WINDOW_HEIGHT / 2 - TEXT_HEIGHT
-	mov rect.bottom, WINDOW_HEIGHT / 2 + TEXT_HEIGHT
-	invoke DrawTextA, hMemDc, offset stringBuffer, -1, ADDR rect, DT_CENTER or DT_VCENTER 
 
+	invoke strlen, offset stringBuffer
+	invoke TextOutA, hMemDc, REAL_WIDTH / 2, REAL_HEIGHT / 2 - 2 * TEXT_HEIGHT, offset stringBuffer, eax
+	mov eax, HINT_TEXT_LEN
+	invoke TextOutA, hMemDc, REAL_WIDTH / 2, REAL_HEIGHT / 2 - TEXT_HEIGHT, offset hintText, eax
+	
 	invoke BeginPaint, hMainWnd, ADDR ps
+	mov eax, hDc
 	invoke BitBlt, hDc, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, hMemDc, 0, 0, SRCCOPY
 	invoke EndPaint, hMainWnd, ADDR ps
-	mov eax, hDc
 	ret
 DrawGameoverScene ENDP
 ; #########################################################################
@@ -1648,6 +1647,16 @@ DestroyDC PROC
 	; tobedone
 	ret
 DestroyDC ENDP
+; #########################################################################
+EmitSound PROC
+	invoke PlaySound, WAVE_EMIT_BULLET, hInstance, SND_RESOURCE or SND_ASYNC
+	ret
+EmitSound ENDP
+; #########################################################################
+ExplosionSound PROC
+	invoke PlaySound, WAVE_EXPLOSION, hInstance, SND_RESOURCE or SND_ASYNC
+	ret
+ExplosionSound ENDP
 ; #########################################################################
 Random PROC		limit: DWORD
 	mov eax, randomSeed

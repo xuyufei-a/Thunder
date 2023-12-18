@@ -96,4 +96,12 @@
       <Filter>资源文件</Filter>
     </Image>
   </ItemGroup>
+  <ItemGroup>
+    <Media Include="audio\emit_bullet.wav">
+      <Filter>资源文件</Filter>
+    </Media>
+    <Media Include="audio\explosion.wav">
+      <Filter>资源文件</Filter>
+    </Media>
+  </ItemGroup>
 </Project>
