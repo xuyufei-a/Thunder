@@ -93,7 +93,7 @@
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>D:\masm32\lib</AdditionalLibraryDirectories>
     </Link>
@@ -111,7 +111,7 @@
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -167,6 +167,7 @@
   <ItemGroup>
     <Image Include="icon1.ico" />
     <Image Include="image\background.bmp" />
+    <Image Include="image\black.bmp" />
     <Image Include="image\boom01.bmp" />
     <Image Include="image\boom01_mask.bmp" />
     <Image Include="image\boom02.bmp" />

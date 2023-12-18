@@ -7,6 +7,7 @@
 	MenuProc PROTO :DWORD, :DWORD, :DWORD, :DWORD
 	GameProc PROTO :DWORD, :DWORD, :DWORD, :DWORD
 	SuspendProc PROTO :DWORD, :DWORD, :DWORD, :DWORD
+	GameoverProc PROTO :DWORD, :DWORD, :DWORD, :DWORD
 
 
 ;-------------function for GSTATUS_GAME status--------------
@@ -21,7 +22,11 @@
 	DrawBullet PROTO
 	DrawExplosion	PROTO
 	DrawGameInfo PROTO
+
 	DrawGameScene PROTO
+	DrawSuspendScene PROTO
+	DrawGameoverScene PROTO
+	DrawMenuScene PROTO
 
 ; function for logic, such as collision dectection, calculating next position
 	; function for initailize
@@ -88,7 +93,12 @@ GAME_REFRESH_INTERVAL	EQU		30
 GSTATUS_MENU		EQU		0
 GSTATUS_GAME		EQU		1
 GSTATUS_SUSPEND		EQU		2
+GSTATUS_GAMEOVER	EQU		3
 
+; menu select
+P1_MODE				EQU		0
+P2_MODE				EQU		1
+QUIT_MODE			EQU		2
 
 ; key value
 
@@ -121,7 +131,7 @@ BULLET_COLOR_ENEMY	EQU		000000FFH
 ; some const for game logic
 
 ; num const
-MAX_HEALTH				EQU		3
+MAX_HEALTH				EQU		1
 
 ; time const
 PLAYER_EMIT_INTERVAL	EQU		10
@@ -229,9 +239,6 @@ Explosion ENDS
 
 ; ===================data========================
 .data 
-szDisplayName	DB "Thunder"
-stringBuffer	DB BUFFER_SIZE dup(?)
-formatNumber	DB "%d", 0
 
 hInstance		DWORD ?	; 创建当前进程的文件的句柄
 hMainWnd		DWORD ? ; 窗口的句柄
@@ -244,6 +251,7 @@ hIcon				DWORD ?	; 当前窗口的图标
 hDc					DWORD ?	; 当前窗口的设备环境
 hBmp				DWORD ?
 hMemDc				DWORD ? ; 内存设备环境
+hDcBlack			DWORD ? ; a black background
 hDcBackground		DWORD ?
 hDcExplosion1		DWORD ?
 hDcExplosion1Mask	DWORD ?
@@ -261,7 +269,9 @@ hDcEnemyPlane2		DWORD ?
 hDcEnemyPlane2Mask	DWORD ?
 hDcHeart			DWORD ?
 hDcHeartMask		DWORD ?
+hFont50				DWORD ?
 hFont30				DWORD ?
+hFont20				DWORD ?
 
 ; circular queue for bullets and planes
 bulletQueue			Bullet QUEUE_SIZE dup(<>)
@@ -297,3 +307,22 @@ randomSeed			DWORD ?
 ; game info
 enemyCountdown		DWORD ?
 score				DWORD ?	
+
+; text strings
+szDisplayName	DB "Thunder"
+stringBuffer	DB BUFFER_SIZE dup(?)
+formatNumber	DB "%d", 0
+formatGameover  DB "Game over, your score is %d", 0ah, "Press q to quit", 0
+pauseText		DB "Pause, press q to quit, press c to continue", 0
+PAUSE_TEXT_LEN	EQU $ - pauseText
+
+menuText		DB "Start Game", 0
+MENU_TEXT_LEN	EQU $ - menuText
+p1Text			DB "1 player ", 0
+P1_TEXT_LEN		EQU $ - p1Text
+p2Text			DB "2 players", 0
+P2_TEXT_LEN		EQU $ - p2Text
+quitText		DB "Quit", 0
+QUIT_TEXT_LEN	EQU $ - quitText
+
+selectMenu		SDWORD P1_MODE

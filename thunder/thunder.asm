@@ -106,10 +106,15 @@ WndProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
 		invoke GameProc, hWin, uMsg, wParam, lParam
 	.elseif gameStatus == GSTATUS_SUSPEND
 		invoke SuspendProc, hWin, uMsg, wParam, lParam
+	.elseif gameStatus == GSTATUS_GAMEOVER
+		invoke GameoverProc, hWin, uMsg, wParam, lParam
 	.endif
 		
 	; tobedone maybe close message should be deal in this function
-	.if uMsg == WM_DESTROY
+	.if uMsg == WM_CLOSE
+
+	.elseif uMsg == WM_DESTROY
+		invoke DestroyDC 
 		invoke PostQuitMessage, 0
 		invoke DestroyDC	
 	.endif
@@ -119,24 +124,62 @@ WndProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
 WndProc ENDP
 ; ########################################################################
 MenuProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
+	local up	  :DWORD
+	local down	  :DWORD
+	local confirm :DWORD
 	.if uMsg == WM_CREATE
 		invoke InitDC
-
 		m2m hMainWnd, [uMsg-4]
 		invoke SetTimer, hMainWnd, 1, GAME_REFRESH_INTERVAL, NULL
 
-		; tobedone  only game part finished, so start game when creating 
-		mov gameStatus, GSTATUS_GAME
-		invoke InitGame, 2
-
+		invoke InitGame, 1
 	.elseif uMsg == WM_KEYDOWN
+		invoke InitGame, 1
+		ret
 
-	.elseif uMsg == WM_CLOSE
+		mov up, False
+		mov down, False
+		mov confirm, False
+		.if wParam == KEY_ENTER 
+			mov confirm, True	
+		.elseif wParam == KEY_ENTER
+			mov confirm, True
+		.elseif wParam == KEY_UPARROW
+			mov up, True
+		.elseif wParam == KEY_DOWNARROW
+			mov down, True
+		.elseif wParam == KEY_W
+			mov up, True
+		.elseif wParam == KEY_S
+			mov down, True
+		.elseif wParam == KEY_ESC
+			jmp @F
+		.endif
 
-	.elseif uMsg == WM_DESTROY
-		
+		.if up == True
+			dec selectMenu
+			.if selectMenu < P1_MODE
+				mov selectMenu, QUIT_MODE
+			.endif
+		.elseif down == True
+			inc selectMenu
+			.if selectMenu > QUIT_MODE
+				mov selectMenu, P1_MODE
+			.endif
+		.elseif confirm == True
+			.if selectMenu == P1_MODE
+				invoke InitGame, 1
+			.elseif selectMenu == P2_MODE
+				invoke InitGame, 2
+			.else 
+			@@:
+				invoke SendMessage, hMainWnd, WM_CLOSE, NULL, NULL		
+			.endif
+		.endif
 	.elseif uMsg == WM_PAINT
-
+		invoke DrawMenuScene
+	.elseif uMsg == WM_TIMER
+		invoke RedrawWindow, hMainWnd, NULL, NULL, 1
 	.endif
 	ret
 MenuProc ENDP
@@ -177,19 +220,19 @@ GameProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
 		.endif
 	.elseif uMsg == WM_PAINT
 		invoke DrawGameScene
-	.elseif uMsg == WM_CLOSE
-
-
-	.elseif uMsg == WM_DESTROY
-		invoke PostQuitMessage, NULL
-
-		; tobedone del created objects
 	.elseif uMsg == WM_TIMER
 		invoke SolveCollision
 		invoke CalNextPos
 		invoke EmitBullet
 		invoke GenerateEnemy
 		invoke RedrawWindow, hMainWnd, NULL, NULL, 1
+		
+		; check if game is over
+		mov eax, p1Plane.health
+		add eax, p2Plane.health
+		.if eax == 0
+			mov gameStatus, GSTATUS_GAMEOVER
+		.endif
 	.endif
 				
 	invoke DefWindowProc, hWin, uMsg, wParam, lParam
@@ -197,14 +240,45 @@ GameProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
 GameProc ENDP
 ; ########################################################################
 SuspendProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
-	;.if uMsg == KEY_DOWN	
-	
-
-
-
+	.if uMsg == WM_KEYDOWN	
+		.if wParam == KEY_Q
+			mov gameStatus, GSTATUS_MENU
+			mov selectMenu, P1_MODE
+		.elseif wParam == KEY_C
+			mov gameStatus, GSTATUS_GAME
+			invoke ClearKeys, 3
+		.endif
+	.elseif uMsg == WM_PAINT
+		invoke DrawSuspendScene
+	.elseif uMsg == WM_TIMER
+		mov eax, p1Plane.health
+		add eax, p2Plane.health
+		.if eax == 0
+			mov gameStatus, GSTATUS_GAMEOVER
+		.endif
+		invoke RedrawWindow, hMainWnd, NULL, NULL, 1
+	.endif
+	ret
 SuspendProc ENDP
 ; ########################################################################
+GameoverProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
+	.if uMsg == WM_KEYDOWN
+		.if wParam == KEY_Q
+			mov gameStatus, GSTATUS_MENU
+			mov selectMenu, P1_MODE
+		.endif
+	.elseif uMsg == WM_PAINT
+		invoke DrawGameoverScene
+	.elseif uMsg == WM_TIMER
+		invoke RedrawWindow, hMainWnd, NULL, NULL, 1
+	.endif
+	ret
+GameoverProc ENDP
+; ########################################################################
 InitGame PROC playerCount: DWORD
+	; change game status
+	mov gameStatus, GSTATUS_GAME
+
 	; init queues
 	invoke InitQueue	
 
@@ -214,6 +288,9 @@ InitGame PROC playerCount: DWORD
 	; init random seed
 	invoke GetTickCount
 	mov randomSeed, eax
+
+	; init keys
+	invoke ClearKeys, 3
 
 	; init player 1	
 	mov p1Plane.plane.rect.x, P1_BIRTH_POINT_X
@@ -1047,6 +1124,91 @@ TopXY PROC wDim:DWORD, sDim:DWORD
 
 TopXY ENDP
 ; #########################################################################
+DrawMenuScene PROC
+	local ps	:PAINTSTRUCT
+	local rect	:RECT
+
+
+	invoke BitBlt, hMemDc, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, hDcBlack, 0, 0, SRCCOPY
+
+	invoke SelectObject, hMemDc, hFont50
+	mov eax, MENU_TEXT_LEN
+	invoke TextOutA, hMemDc, REAL_WIDTH / 2, REAL_HEIGHT / 2 - 2 * TEXT_HEIGHT, offset menuText, eax
+
+	invoke SetBkMode, hMemDc, OPAQUE
+	invoke SelectObject, hMemDc, hFont30
+	mov eax, P1_TEXT_LEN
+	invoke TextOutA, hMemDc, REAL_WIDTH / 2, REAL_HEIGHT / 2, offset p1Text, eax
+	mov eax, P2_TEXT_LEN
+	invoke TextOutA, hMemDc, REAL_WIDTH / 2, REAL_HEIGHT / 2 + TEXT_HEIGHT, offset p2Text, eax
+	mov eax, QUIT_TEXT_LEN
+	invoke TextOutA, hMemDc, REAL_WIDTH / 2, REAL_HEIGHT / 2 + 2 * TEXT_HEIGHT, offset quitText, eax
+
+	invoke SetBkColor, hMemDc, COLOR_WHITE
+	invoke SetTextColor, hMemDc, COLOR_BLACK
+	.if selectMenu == P1_MODE
+		mov eax, P1_TEXT_LEN
+		invoke TextOutA, hMemDc, REAL_WIDTH / 2, REAL_HEIGHT / 2, offset p1Text, eax
+	.elseif selectMenu == P2_MODE
+		mov eax, P2_TEXT_LEN
+		invoke TextOutA, hMemDc, REAL_WIDTH / 2, REAL_HEIGHT / 2 + TEXT_HEIGHT, offset p2Text, eax
+	.else
+		mov eax, QUIT_TEXT_LEN
+		invoke TextOutA, hMemDc, REAL_WIDTH / 2, REAL_HEIGHT / 2 + 2 * TEXT_HEIGHT, offset quitText, eax
+	.endif
+	invoke SetBkColor, hMemDc, COLOR_BLACK
+	invoke SetTextColor, hMemDc, COLOR_WHITE
+	
+	invoke BeginPaint, hMainWnd, ADDR ps
+	invoke BitBlt, hDc, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, hMemDc, 0, 0, SRCCOPY
+	invoke EndPaint, hMainWnd, ADDR ps
+	mov eax, hDc
+	ret
+DrawMenuScene ENDP
+; #########################################################################
+DrawGameoverScene PROC
+	local ps	:PAINTSTRUCT
+	local rect	:RECT
+
+	invoke BitBlt, hMemDc, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, hDcBlack, 0, 0, SRCCOPY
+	
+	invoke wsprintfA, offset stringBuffer, offset formatGameover, score
+	invoke SelectObject, hMemDc, hFont30
+	invoke SetBkMode, hMemDc, TRANSPARENT
+	invoke SetTextAlign, hMemDc, TA_CENTER
+	mov rect.left, 0
+	mov rect.right, WINDOW_WIDTH
+	mov rect.top, WINDOW_HEIGHT / 2 - TEXT_HEIGHT
+	mov rect.bottom, WINDOW_HEIGHT / 2 + TEXT_HEIGHT
+	invoke DrawTextA, hMemDc, offset stringBuffer, -1, ADDR rect, DT_CENTER or DT_VCENTER 
+
+	invoke BeginPaint, hMainWnd, ADDR ps
+	invoke BitBlt, hDc, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, hMemDc, 0, 0, SRCCOPY
+	invoke EndPaint, hMainWnd, ADDR ps
+	mov eax, hDc
+	ret
+DrawGameoverScene ENDP
+; #########################################################################
+DrawSuspendScene PROC
+	local ps	:PAINTSTRUCT
+
+	invoke BeginPaint, hMainWnd, ADDR ps
+	mov eax, hDc
+
+	; replicate the gameScene
+	invoke BitBlt, hMemDc, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, hDc, 0, 0, SRCCOPY
+
+	; set the style
+	invoke SelectObject, hMemDc, hFont20
+	invoke SetBkMode, hMemDc, OPAQUE
+	mov eax, PAUSE_TEXT_LEN
+	invoke TextOutA, hMemDc, (REAL_WIDTH / 2), (REAL_HEIGHT / 2), offset pauseText, eax
+	; draw
+	invoke BitBlt, hDc, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, hMemDc, 0, 0, SRCCOPY
+	invoke EndPaint, hMainWnd, ADDR ps
+	ret
+DrawSuspendScene ENDP
+; #########################################################################
 DrawGameScene PROC
 	local ps	:PAINTSTRUCT
 
@@ -1239,6 +1401,7 @@ DrawGameInfo PROC
 
 	invoke wsprintfA, offset stringBuffer, offset formatNumber, score
 	invoke SetBkMode, hMemDc, TRANSPARENT
+	invoke SelectObject, hMemDc, hFont20
 	invoke DrawTextA, hMemDc, offset stringBuffer, -1, ADDR rect, DT_CENTER or DT_VCENTER or DT_SINGLELINE
 
 	; draw health
@@ -1328,12 +1491,17 @@ InitDC PROC
 
 	; create resource DC
 	; create font 
+	invoke CreateFontA,50,0,0,0,700,0,0,0,GB2312_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,ANTIALIASED_QUALITY,FF_DECORATIVE,NULL
+	mov hFont50, eax
 	invoke CreateFontA,30,0,0,0,700,0,0,0,GB2312_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,ANTIALIASED_QUALITY,FF_DECORATIVE,NULL
 	mov hFont30, eax
-	invoke SelectObject, hMemDc, hFont30
+	invoke CreateFontA,20,0,0,0,700,0,0,0,GB2312_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,ANTIALIASED_QUALITY,FF_DECORATIVE,NULL
+	mov hFont20, eax
 
-	; set font color
+	; set font and bk color
 	invoke SetTextColor, hMemDc, COLOR_WHITE
+	invoke SetTextAlign, hMemDc, TA_CENTER
+	invoke SetBkColor, hMemDc, COLOR_BLACK
 
 	; create a background DC
 	invoke CreateCompatibleDC, hDc
@@ -1341,6 +1509,14 @@ InitDC PROC
     invoke LoadBitmap, hInstance, BMP_BACKGROUND
 	mov hBmp, eax
 	invoke SelectObject, hDcBackground, hBmp
+	invoke DeleteObject, hBmp
+
+	; a black DC
+	invoke CreateCompatibleDC, hDc
+	mov hDcBlack, eax
+	invoke LoadBitmap, hInstance, BMP_BLACK
+	mov hBmp, eax
+	invoke SelectObject, hDcBlack, hBmp
 	invoke DeleteObject, hBmp
 
 	; explosion and its mask
