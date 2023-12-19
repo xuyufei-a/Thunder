@@ -143,8 +143,9 @@ MAX_HEALTH				EQU		3
 PLAYER_EMIT_INTERVAL	EQU		10
 ENEMY_EMIT_INTERVAL		EQU		100
 EXPLOSION_DURATION		EQU		10
-ENEMY_INTERVAL			EQU		5
-REBIRTH_INTERVAL		EQU		50
+ENEMY_INTERVAL			EQU		3
+REBIRTH_INTERVAL		EQU		100
+FREEZE_INTERVAL			EQU		20
 
 
 ; size const
@@ -324,7 +325,7 @@ HINT_TEXT_LEN	EQU $ - hintText
 pauseText		DB "Pause, press q to quit, press c to continue", 0
 PAUSE_TEXT_LEN	EQU $ - pauseText
 
-menuText		DB "Start Game", 0, "nihao"
+menuText		DB "Start Game", 0 
 MENU_TEXT_LEN	EQU $ - menuText
 p1Text			DB "1 player ", 0
 P1_TEXT_LEN		EQU $ - p1Text

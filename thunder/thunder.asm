@@ -370,6 +370,7 @@ EmitBullet PROC
 	ASSUME esi: PTR PlayerPlane
 	mov eax, [esi].plane.nextEmitCountdown
 	.if [esi].health > 0
+	.if [esi].rebirthDuration <= REBIRTH_INTERVAL - FREEZE_INTERVAL
 		.if eax != 0
 			dec eax
 		.endif
@@ -396,12 +397,14 @@ EmitBullet PROC
 		.endif
 		mov [esi].plane.nextEmitCountdown, eax
 	.endif
+	.endif
 
 	mov esi, offset p2Plane
 	ASSUME esi: PTR PlayerPlane
 	mov eax, [esi].plane.nextEmitCountdown
 	ASSUME eax: SDWORD
 	.if [esi].health > 0
+	.if [esi].rebirthDuration <= REBIRTH_INTERVAL - FREEZE_INTERVAL
 		.if eax != 0
 			dec eax
 		.endif
@@ -427,6 +430,7 @@ EmitBullet PROC
 		.endif
 		.endif
 		mov [esi].plane.nextEmitCountdown, eax
+	.endif
 	.endif
 	ret
 EmitBullet ENDP
@@ -738,7 +742,7 @@ SolveCollision PROC
 			invoke AddNewExplosion, esi
 			mov flag, True
 			dec [edi].health
-			mov [edi].plane.rect.x, P1_BIRTH_POINT_X
+			mov [edi].plane.rect.x, P2_BIRTH_POINT_X
 			mov [edi].rebirthDuration, REBIRTH_INTERVAL
 		.elseif 
 			invoke PushPlane, esi
@@ -841,6 +845,7 @@ CalNextPos PROC
 	ASSUME edi: PTR PlayerPlane
 	
 	.if aKeyHold == True
+	.if p1Plane.rebirthDuration <= REBIRTH_INTERVAL - FREEZE_INTERVAL
 		mov eax, [edi].plane.rect.x
 		sub eax, [edi].plane.xSpeed
 		mov [edi].plane.rect.x, eax
@@ -848,20 +853,24 @@ CalNextPos PROC
 			mov [edi].plane.rect.x, 0
 		.endif
 	.endif
+	.endif
 	
 	.if dKeyHold == True
+	.if p1Plane.rebirthDuration <= REBIRTH_INTERVAL - FREEZE_INTERVAL
 		mov eax, [edi].plane.rect.x
 		add eax, [edi].plane.xSpeed
 		.if eax > REAL_WIDTH - PLAYER_PLANE_WIDTH
 			mov eax, REAL_WIDTH - PLAYER_PLANE_WIDTH
 		.endif
 		mov [edi].plane.rect.x, eax
+	.endif
 	.endif
 
 	mov edi, offset p2Plane
 	ASSUME edi: PTR PlayerPlane
 
 	.if leftKeyHold == True
+	.if p2Plane.rebirthDuration <= REBIRTH_INTERVAL - FREEZE_INTERVAL
 		mov eax, [edi].plane.rect.x
 		sub eax, [edi].plane.xSpeed
 		mov [edi].plane.rect.x, eax
@@ -869,14 +878,17 @@ CalNextPos PROC
 			mov [edi].plane.rect.x, 0
 		.endif
 	.endif
+	.endif
 
 	.if rightKeyHold == True
+	.if p2Plane.rebirthDuration <= REBIRTH_INTERVAL - FREEZE_INTERVAL
 		mov eax, [edi].plane.rect.x
 		add eax, [edi].plane.xSpeed
 		.if eax > REAL_WIDTH - PLAYER_PLANE_WIDTH
 			mov eax, REAL_WIDTH - PLAYER_PLANE_WIDTH
 		.endif
 		mov [edi].plane.rect.x, eax
+	.endif
 	.endif
 	ret
 CalNextPos ENDP
@@ -1177,9 +1189,9 @@ DrawGameoverScene PROC
 	invoke SetBkMode, hMemDc, TRANSPARENT
 
 	invoke strlen, offset stringBuffer
-	invoke TextOutA, hMemDc, REAL_WIDTH / 2, REAL_HEIGHT / 2 - 2 * TEXT_HEIGHT, offset stringBuffer, eax
+	invoke TextOutA, hMemDc, REAL_WIDTH / 2, REAL_HEIGHT / 2 - TEXT_HEIGHT, offset stringBuffer, eax
 	mov eax, HINT_TEXT_LEN
-	invoke TextOutA, hMemDc, REAL_WIDTH / 2, REAL_HEIGHT / 2 - TEXT_HEIGHT, offset hintText, eax
+	invoke TextOutA, hMemDc, REAL_WIDTH / 2, REAL_HEIGHT / 2, offset hintText, eax
 	
 	invoke BeginPaint, hMainWnd, ADDR ps
 	mov eax, hDc
@@ -1644,7 +1656,29 @@ InitDC PROC
 InitDC ENDP
 ; #########################################################################
 DestroyDC PROC
-	; tobedone
+	invoke DeleteObject, hMemDc
+	invoke DeleteObject, hDcBackground
+	invoke DeleteObject, hDcBlack
+	invoke DeleteObject, hDcBackground
+	invoke DeleteObject, hDcExplosion1
+	invoke DeleteObject, hDcExplosion1Mask
+	invoke DeleteObject, hDcExplosion2
+	invoke DeleteObject, hDcExplosion2Mask
+	invoke DeleteObject, hDcExplosion3
+	invoke DeleteObject, hDcExplosion3Mask
+	invoke DeleteObject, hDcPlayerPlane1
+	invoke DeleteObject, hDcPlayerPlane1Mask
+	invoke DeleteObject, hDcPlayerPlane2
+	invoke DeleteObject, hDcPlayerPlane2Mask
+	invoke DeleteObject, hDcEnemyPlane1
+	invoke DeleteObject, hDcEnemyPlane1Mask
+	invoke DeleteObject, hDcEnemyPlane2
+	invoke DeleteObject, hDcEnemyPlane2Mask
+	invoke DeleteObject, hDcHeart
+	invoke DeleteObject, hDcHeartMask
+	invoke DeleteObject, hFont50
+	invoke DeleteObject, hFont30
+	invoke DeleteObject, hFont20
 	ret
 DestroyDC ENDP
 ; #########################################################################
