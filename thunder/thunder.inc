@@ -1,5 +1,5 @@
+; =========C prototypes===========
 	strlen PROTO C :DWORD
-
 
 ;=========local prototypes========
 	WinMain PROTO
@@ -12,10 +12,7 @@
 	SuspendProc PROTO :DWORD, :DWORD, :DWORD, :DWORD
 	GameoverProc PROTO :DWORD, :DWORD, :DWORD, :DWORD
 
-
-;-------------function for GSTATUS_GAME status--------------
-; function to generate random number
-	Random PROTO :DWORD	; parameter is the limit of random number, return value is the random number
+;=========four main type funcitons: sound, paint, logic and data structrue========
 ; function for sound
 	EmitSound PROTO 	; parameter is the sound resource id
 	ExplosionSound PROTO
@@ -35,6 +32,8 @@
 	DrawMenuScene PROTO
 
 ; function for logic, such as collision dectection, calculating next position
+	; function to generate random number
+	Random PROTO :DWORD	; parameter is the limit of random number, return value is the random number
 	; function for initailize
 	InitGame	PROTO	:DWORD				; pamameter is the number of players(1 or 2)
 
@@ -52,7 +51,7 @@
 	EmitBullet PROTO						; the pamameter notify which player
 	
 	
-	; function to manipulate circular queue
+; function to manipulate circular queue
 	InitQueue PROTO
 	PushBullet PROTO :DWORD
 	PopBullet PROTO

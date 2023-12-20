@@ -129,13 +129,13 @@ MenuProc PROC hWin: DWORD, uMsg: DWORD, wParam: DWORD, lParam: DWORD
 	local confirm :DWORD
 	.if uMsg == WM_CREATE
 		invoke InitDC
-		m2m hMainWnd, [uMsg-4]
+		m2m hMainWnd, hWin
 		invoke SetTimer, hMainWnd, 1, GAME_REFRESH_INTERVAL, NULL
 	.elseif uMsg == WM_KEYDOWN
 		mov up, False
 		mov down, False
 		mov confirm, False
-		.if wParam == KEY_ENTER 
+		.if wParam == KEY_SPACEBAR 
 			mov confirm, True	
 		.elseif wParam == KEY_ENTER
 			mov confirm, True
