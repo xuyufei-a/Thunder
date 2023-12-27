@@ -324,7 +324,7 @@ HINT_TEXT_LEN	EQU $ - hintText
 pauseText		DB "Pause, press q to quit, press c to continue", 0
 PAUSE_TEXT_LEN	EQU $ - pauseText
 
-menuText		DB "Start Game", 0 
+menuText		DB "Thunder", 0 
 MENU_TEXT_LEN	EQU $ - menuText
 p1Text			DB "1 player ", 0
 P1_TEXT_LEN		EQU $ - p1Text

@@ -1392,12 +1392,7 @@ DrawExplosion ENDP
 DrawBackground PROC
 	local wndRect		:RECT
 
-	invoke GetDC, hMainWnd
-	mov hDc, eax
-	
 	invoke BitBlt, hMemDc, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, hDcBackground, 0, 0, SRCCOPY	
-	
-	invoke ReleaseDC, hMainWnd, hDc
 	ret
 DrawBackground ENDP
 ; #########################################################################
